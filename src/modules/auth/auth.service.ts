@@ -23,14 +23,17 @@ export class AuthService {
   }
 
   async login(user: any) {
-    const payload = { username: user.username, sub: user.id };
+    const currentUser = await this.userRepository.findOne({
+      where: { id: user.id },
+    });
+
+    const payload = { username: currentUser.username, sub: currentUser.id };
+    
+    const { password, ...userInfo } = currentUser;
+    
     return {
       access_token: this.jwtService.sign(payload),
-      user: {
-        id: user.id,
-        username: user.username,
-        isAdmin: user.isAdmin,
-      },
+      user: userInfo,
     };
   }
 

@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Crew } from '../../entities/crew.entity';
+import { CrewRank } from '../../entities/crew-rank.entity';
 import { CrewEarning } from '../../entities/crew-earning.entity';
 
 @Injectable()
@@ -9,6 +10,8 @@ export class CrewService {
   constructor(
     @InjectRepository(Crew)
     private crewRepository: Repository<Crew>,
+    @InjectRepository(CrewRank)
+    private crewRankRepository: Repository<CrewRank>,
     @InjectRepository(CrewEarning)
     private crewEarningRepository: Repository<CrewEarning>,
   ) {}
@@ -42,13 +45,48 @@ export class CrewService {
       .getOne();
   }
 
-  async create(crewData: Partial<Crew>): Promise<Crew> {
-    const crew = this.crewRepository.create(crewData);
-    return this.crewRepository.save(crew);
+  async create(crewData: any): Promise<Crew> {
+    const { ranks, ...crewInfo } = crewData;
+
+    // 크루 생성 및 저장
+    const newCrew = this.crewRepository.create(crewInfo);
+    const savedCrew = await this.crewRepository.save(newCrew);
+
+    // 계급 생성
+    if (ranks && ranks.length > 0) {
+      const rankEntities = ranks.map((rank) =>
+        this.crewRankRepository.create({
+          ...rank,
+          crew: savedCrew,
+        }),
+      );
+      await this.crewRankRepository.save(rankEntities);
+    }
+
+    // 저장된 크루의 전체 정보를 조회하여 반환
+    return this.findOne(savedCrew[0].id);
   }
 
-  async update(id: number, crewData: Partial<Crew>): Promise<Crew> {
-    await this.crewRepository.update(id, crewData);
+  async update(id: number, crewData: any): Promise<Crew> {
+    const { ranks, ...crewInfo } = crewData;
+
+    // 크루 정보 업데이트
+    await this.crewRepository.update(id, crewInfo);
+
+    if (ranks) {
+      // 기존 계급 삭제
+      await this.crewRankRepository.delete({ crew: { id } });
+
+      // 새로운 계급 생성
+      const rankEntities = ranks.map((rank) =>
+        this.crewRankRepository.create({
+          ...rank,
+          crew: { id },
+        }),
+      );
+      await this.crewRankRepository.save(rankEntities);
+    }
+
     return this.findOne(id);
   }
 

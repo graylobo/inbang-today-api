@@ -13,7 +13,7 @@ export class CrewEarning {
   @PrimaryGeneratedColumn()
   id: number;
 
-  @ManyToOne(() => CrewMember, { eager: true })
+  @ManyToOne(() => CrewMember, { eager: true, onDelete: 'CASCADE' })
   member: CrewMember;
 
   @ManyToOne(() => User, { eager: true })

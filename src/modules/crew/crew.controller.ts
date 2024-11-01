@@ -19,11 +19,10 @@ export class CrewController {
 
   @Get('rankings')
   async getCrewRankings(
-    @Query('year') yearStr: any,
-    @Query('month') monthStr: any,
+    @Query('year') yearStr: string = new Date().getFullYear().toString(),
+    @Query('month') monthStr: string = (new Date().getMonth() + 1).toString(),
   ) {
     try {
-      console.log('year:', yearStr, 'month:', monthStr);
       const year = parseInt(yearStr);
       const month = parseInt(monthStr);
 
