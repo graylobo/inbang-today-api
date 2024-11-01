@@ -1,6 +1,8 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { ConfigModule } from '@nestjs/config';
+import { AuthModule } from './modules/auth/auth.module';
+import { User } from './entities/user.entity';
 import { CrewMember } from './entities/crew-member.entity';
 import { CrewRank } from './entities/crew-rank.entity';
 import { CrewEarning } from './entities/crew-earning.entity';
@@ -20,10 +22,11 @@ import { CrewEarningModule } from './modules/crew-earning/crew-earning.module';
       username: process.env.DB_USERNAME || 'postgres',
       password: process.env.DB_PASSWORD || 'postgres',
       database: process.env.DB_NAME || 'inbang',
-      entities: [Crew, CrewMember, CrewRank, CrewEarning],
+      entities: [Crew, CrewMember, CrewRank, CrewEarning, User],
       synchronize: true,
       // logging: true, // SQL 쿼리 로깅 활성화
     }),
+    AuthModule,
     CrewModule,
     CrewMemberModule,
     CrewRankModule,

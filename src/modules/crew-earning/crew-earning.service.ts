@@ -71,6 +71,7 @@ export class CrewEarningService {
       .leftJoinAndSelect('earning.member', 'member')
       .leftJoinAndSelect('member.rank', 'rank')
       .leftJoinAndSelect('member.crew', 'crew')
+      .leftJoinAndSelect('earning.submittedBy', 'submittedBy')
       .where('crew.id = :crewId', { crewId })
       .andWhere('earning.earningDate BETWEEN :startDate AND :endDate', {
         startDate,
@@ -80,9 +81,7 @@ export class CrewEarningService {
       .addOrderBy('rank.level', 'ASC')
       .getMany();
 
-    // 디버깅을 위한 로그
     console.log('Fetched earnings:', JSON.stringify(earnings, null, 2));
-    
     return earnings;
   }
 }

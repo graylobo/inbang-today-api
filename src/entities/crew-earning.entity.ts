@@ -6,6 +6,7 @@ import {
   CreateDateColumn,
 } from 'typeorm';
 import { CrewMember } from './crew-member.entity';
+import { User } from './user.entity';
 
 @Entity()
 export class CrewEarning {
@@ -14,6 +15,9 @@ export class CrewEarning {
 
   @ManyToOne(() => CrewMember, { eager: true })
   member: CrewMember;
+
+  @ManyToOne(() => User, { eager: true })
+  submittedBy: User;
 
   @Column('decimal', { precision: 10, scale: 2 })
   amount: number;
@@ -25,8 +29,8 @@ export class CrewEarning {
   createdAt: Date;
 
   @Column({ default: 0 })
-  reportCount: number; // 허위 신고 횟수를 기록
+  reportCount: number;
 
   @Column({ default: false })
-  isVerified: boolean; // 검증된 데이터인지 여부
+  isVerified: boolean;
 }

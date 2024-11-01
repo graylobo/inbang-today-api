@@ -7,7 +7,11 @@ import {
   Query,
   HttpException,
   HttpStatus,
+  UseGuards,
+  Request,
 } from '@nestjs/common';
+import { JwtAuthGuard } from '../../guards/jwt-auth.guard';
+import { User } from '../../entities/user.entity';
 import { CrewEarningService } from './crew-earning.service';
 import { CrewEarning } from '../../entities/crew-earning.entity';
 
@@ -15,11 +19,14 @@ import { CrewEarning } from '../../entities/crew-earning.entity';
 export class CrewEarningController {
   constructor(private readonly crewEarningService: CrewEarningService) {}
 
+  @UseGuards(JwtAuthGuard)
   @Post()
   async create(
+    @Request() req,
     @Body() earningData: Partial<CrewEarning>,
   ): Promise<CrewEarning> {
     try {
+      earningData.submittedBy = { id: req.user.userId } as User;
       return await this.crewEarningService.create(earningData);
     } catch (error) {
       if (error instanceof HttpException) {
