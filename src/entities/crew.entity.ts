@@ -13,6 +13,9 @@ export class Crew {
   @Column({ type: 'text', nullable: true })
   description: string;
 
+  @Column({ nullable: true })
+  iconUrl: string;
+
   @OneToMany(() => CrewMember, (member) => member.crew)
   members: CrewMember[];
 

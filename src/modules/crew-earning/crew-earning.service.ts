@@ -66,15 +66,23 @@ export class CrewEarningService {
     startDate: Date,
     endDate: Date,
   ): Promise<any> {
-    return this.crewEarningRepository
+    const earnings = await this.crewEarningRepository
       .createQueryBuilder('earning')
       .leftJoinAndSelect('earning.member', 'member')
+      .leftJoinAndSelect('member.rank', 'rank')
       .leftJoinAndSelect('member.crew', 'crew')
       .where('crew.id = :crewId', { crewId })
       .andWhere('earning.earningDate BETWEEN :startDate AND :endDate', {
         startDate,
         endDate,
       })
+      .orderBy('earning.earningDate', 'DESC')
+      .addOrderBy('rank.level', 'ASC')
       .getMany();
+
+    // 디버깅을 위한 로그
+    console.log('Fetched earnings:', JSON.stringify(earnings, null, 2));
+    
+    return earnings;
   }
 }

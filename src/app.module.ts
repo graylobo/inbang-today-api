@@ -22,7 +22,7 @@ import { CrewEarningModule } from './modules/crew-earning/crew-earning.module';
       database: process.env.DB_NAME || 'inbang',
       entities: [Crew, CrewMember, CrewRank, CrewEarning],
       synchronize: true,
-      logging: true, // SQL 쿼리 로깅 활성화
+      // logging: true, // SQL 쿼리 로깅 활성화
     }),
     CrewModule,
     CrewMemberModule,

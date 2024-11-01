@@ -12,7 +12,7 @@ export class CrewEarning {
   @PrimaryGeneratedColumn()
   id: number;
 
-  @ManyToOne(() => CrewMember)
+  @ManyToOne(() => CrewMember, { eager: true })
   member: CrewMember;
 
   @Column('decimal', { precision: 10, scale: 2 })

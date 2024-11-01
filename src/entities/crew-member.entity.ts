@@ -10,9 +10,15 @@ export class CrewMember {
   @Column()
   name: string;
 
+  @Column({ nullable: true })
+  profileImageUrl: string;
+
+  @Column({ nullable: true })
+  broadcastUrl: string;
+
   @ManyToOne(() => Crew, (crew) => crew.members)
   crew: Crew;
 
-  @ManyToOne(() => CrewRank, (rank) => rank.members)
+  @ManyToOne(() => CrewRank, (rank) => rank.members, { eager: true })
   rank: CrewRank;
 }

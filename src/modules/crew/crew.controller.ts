@@ -8,6 +8,7 @@ import {
   Param,
   HttpException,
   HttpStatus,
+  Query,
 } from '@nestjs/common';
 import { CrewService } from './crew.service';
 import { Crew } from '../../entities/crew.entity';
@@ -15,6 +16,33 @@ import { Crew } from '../../entities/crew.entity';
 @Controller('crews')
 export class CrewController {
   constructor(private readonly crewService: CrewService) {}
+
+  @Get('rankings')
+  async getCrewRankings(
+    @Query('year') yearStr: any,
+    @Query('month') monthStr: any,
+  ) {
+    try {
+      console.log('year:', yearStr, 'month:', monthStr);
+      const year = parseInt(yearStr);
+      const month = parseInt(monthStr);
+
+      if (isNaN(year) || isNaN(month)) {
+        throw new HttpException(
+          'Invalid year or month parameter',
+          HttpStatus.BAD_REQUEST,
+        );
+      }
+
+      return await this.crewService.findAllWithMonthlyEarnings(year, month);
+    } catch (error) {
+      console.error('Rankings error:', error);
+      throw new HttpException(
+        error.message || 'Failed to fetch rankings',
+        error.status || HttpStatus.INTERNAL_SERVER_ERROR,
+      );
+    }
+  }
 
   @Get()
   async findAll(): Promise<Crew[]> {
