@@ -1,6 +1,7 @@
 import { Entity, PrimaryGeneratedColumn, Column, OneToMany } from 'typeorm';
 import { CrewMember } from './crew-member.entity';
 import { CrewRank } from './crew-rank.entity';
+import { CrewBroadcast } from './crew-broadcast.entity';
 
 @Entity()
 export class Crew {
@@ -21,4 +22,7 @@ export class Crew {
 
   @OneToMany(() => CrewRank, (rank) => rank.crew)
   ranks: CrewRank[];
+
+  @OneToMany(() => CrewBroadcast, broadcast => broadcast.crew)
+  broadcasts: CrewBroadcast[];
 }
