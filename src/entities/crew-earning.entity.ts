@@ -19,7 +19,7 @@ export class CrewEarning {
   @ManyToOne(() => User, { eager: true })
   submittedBy: User;
 
-  @Column('decimal', { precision: 10, scale: 2 })
+  @Column('integer')
   amount: number;
 
   @Column({ type: 'date' })

@@ -23,6 +23,6 @@ export class Crew {
   @OneToMany(() => CrewRank, (rank) => rank.crew)
   ranks: CrewRank[];
 
-  @OneToMany(() => CrewBroadcast, broadcast => broadcast.crew)
+  @OneToMany(() => CrewBroadcast, (broadcast) => broadcast.crew)
   broadcasts: CrewBroadcast[];
 }

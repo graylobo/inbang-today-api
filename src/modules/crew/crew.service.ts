@@ -1,9 +1,10 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { Repository, Between } from 'typeorm';
 import { Crew } from '../../entities/crew.entity';
 import { CrewRank } from '../../entities/crew-rank.entity';
 import { CrewEarning } from '../../entities/crew-earning.entity';
+import { CrewBroadcast } from '../../entities/crew-broadcast.entity';
 
 @Injectable()
 export class CrewService {
@@ -14,6 +15,8 @@ export class CrewService {
     private crewRankRepository: Repository<CrewRank>,
     @InjectRepository(CrewEarning)
     private crewEarningRepository: Repository<CrewEarning>,
+    @InjectRepository(CrewBroadcast)
+    private crewBroadcastRepository: Repository<CrewBroadcast>,
   ) {}
 
   async findAll(): Promise<Crew[]> {
@@ -98,14 +101,8 @@ export class CrewService {
     year: number,
     month: number,
   ): Promise<any[]> {
-    if (isNaN(year) || isNaN(month)) {
-      throw new Error('Invalid year or month');
-    }
-
     const startDate = new Date(year, month - 1, 1);
     const endDate = new Date(year, month, 0);
-
-    console.log('Date range:', { startDate, endDate });
 
     const crews = await this.crewRepository
       .createQueryBuilder('crew')
@@ -114,20 +111,68 @@ export class CrewService {
       .leftJoinAndSelect('members.rank', 'memberRank')
       .getMany();
 
-    const crewEarnings = await this.crewEarningRepository
+    // 크루 레벨 수익 조회
+    const crewBroadcasts = await this.crewBroadcastRepository.find({
+      where: {
+        broadcastDate: Between(startDate, endDate),
+      },
+      relations: ['crew'],
+    });
+
+    // 멤버별 수익 조회
+    const memberEarnings = await this.crewEarningRepository
       .createQueryBuilder('earning')
       .leftJoinAndSelect('earning.member', 'member')
       .leftJoinAndSelect('member.crew', 'crew')
-      .where('earning.earningDate >= :startDate', { startDate })
-      .andWhere('earning.earningDate <= :endDate', { endDate })
+      .where('earning.earningDate BETWEEN :startDate AND :endDate', {
+        startDate,
+        endDate,
+      })
       .getMany();
 
-    console.log('Earnings found:', crewEarnings.length);
+    // 날짜별 수익 계산을 위한 맵 생성
+    const crewDailyEarnings = new Map<string, Map<number, number>>();
 
+    // 크루 레벨 수익을 먼저 처리 (우선순위가 높음)
+    crewBroadcasts.forEach((broadcast) => {
+      const dateKey = new Date(broadcast.broadcastDate)
+        .toISOString()
+        .split('T')[0];
+      if (!crewDailyEarnings.has(dateKey)) {
+        crewDailyEarnings.set(dateKey, new Map());
+      }
+      crewDailyEarnings
+        .get(dateKey)
+        ?.set(broadcast.crew.id, Number(broadcast.totalAmount));
+    });
+
+    // 멤버별 수익은 해당 날짜에 크루 레벨 수익이 없는 경우에만 처리
+    memberEarnings.forEach((earning) => {
+      const dateKey = new Date(earning.earningDate).toISOString().split('T')[0];
+      const crewId = earning.member.crew.id;
+
+      if (!crewDailyEarnings.has(dateKey)) {
+        crewDailyEarnings.set(dateKey, new Map());
+      }
+
+      const dailyMap = crewDailyEarnings.get(dateKey)!;
+      if (!dailyMap.has(crewId)) {
+        // 해당 날짜에 크루 레벨 수익이 없는 경우에만 멤버 수익을 더함
+        dailyMap.set(
+          crewId,
+          (dailyMap.get(crewId) || 0) + Number(earning.amount),
+        );
+      }
+    });
+
+    // 크루별 총 수익 계산
     const crewsWithEarnings = crews.map((crew) => {
-      const monthlyEarnings = crewEarnings
-        .filter((earning) => earning.member.crew.id === crew.id)
-        .reduce((sum, earning) => sum + Number(earning.amount), 0);
+      let monthlyEarnings = 0;
+      crewDailyEarnings.forEach((dailyMap) => {
+        if (dailyMap.has(crew.id)) {
+          monthlyEarnings += dailyMap.get(crew.id) || 0;
+        }
+      });
 
       return {
         ...crew,

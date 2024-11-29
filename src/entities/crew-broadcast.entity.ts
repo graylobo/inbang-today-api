@@ -16,7 +16,7 @@ export class CrewBroadcast {
   @ManyToOne(() => Crew, (crew) => crew.broadcasts)
   crew: Crew;
 
-  @Column('decimal', { precision: 10, scale: 2 })
+  @Column('integer')
   totalAmount: number;
 
   @Column({ type: 'date' })

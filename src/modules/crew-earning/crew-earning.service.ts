@@ -1,13 +1,16 @@
 import { Injectable, HttpException, HttpStatus } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { Repository, Between } from 'typeorm';
 import { CrewEarning } from '../../entities/crew-earning.entity';
+import { CrewBroadcast } from '../../entities/crew-broadcast.entity';
 
 @Injectable()
 export class CrewEarningService {
   constructor(
     @InjectRepository(CrewEarning)
     private crewEarningRepository: Repository<CrewEarning>,
+    @InjectRepository(CrewBroadcast)
+    private crewBroadcastRepository: Repository<CrewBroadcast>,
   ) {}
 
   async findByMemberAndDate(
@@ -66,7 +69,18 @@ export class CrewEarningService {
     startDate: Date,
     endDate: Date,
   ): Promise<any> {
-    const earnings = await this.crewEarningRepository
+    // 크루 레벨 수익 조회
+    const crewBroadcasts = await this.crewBroadcastRepository.find({
+      where: {
+        crew: { id: crewId },
+        broadcastDate: Between(startDate, endDate),
+      },
+      relations: ['submittedBy'],
+      order: { broadcastDate: 'DESC' },
+    });
+
+    // 멤버별 수익 조회
+    const memberEarnings = await this.crewEarningRepository
       .createQueryBuilder('earning')
       .leftJoinAndSelect('earning.member', 'member')
       .leftJoinAndSelect('member.rank', 'rank')
@@ -81,7 +95,62 @@ export class CrewEarningService {
       .addOrderBy('rank.level', 'ASC')
       .getMany();
 
-    console.log('Fetched earnings:', JSON.stringify(earnings, null, 2));
-    return earnings;
+    // 날짜별로 수익 정보 병합
+    const dailyEarnings = new Map();
+
+    // 멤버별 수익을 먼저 처리
+    memberEarnings.forEach((earning) => {
+      const dateKey = new Date(earning.earningDate).toISOString().split('T')[0];
+      if (!dailyEarnings.has(dateKey)) {
+        dailyEarnings.set(dateKey, {
+          date: dateKey,
+          isBroadcastEarning: false,
+          totalAmount: 0,
+          earnings: [],
+          broadcastEarning: null,
+        });
+      }
+      const dailyData = dailyEarnings.get(dateKey);
+      dailyData.earnings.push(earning);
+      // 크루 방송 수익이 없는 경우에만 멤버 수익을 합산
+      if (!dailyData.broadcastEarning) {
+        dailyData.totalAmount += Math.floor(Number(earning.amount));
+      }
+    });
+
+    // 크루 방송 수익 처리
+    crewBroadcasts.forEach((broadcast) => {
+      const dateKey = new Date(broadcast.broadcastDate)
+        .toISOString()
+        .split('T')[0];
+      if (!dailyEarnings.has(dateKey)) {
+        dailyEarnings.set(dateKey, {
+          date: dateKey,
+          isBroadcastEarning: false,
+          totalAmount: 0,
+          earnings: [],
+          broadcastEarning: null,
+        });
+      }
+      const dailyData = dailyEarnings.get(dateKey);
+      dailyData.broadcastEarning = {
+        totalAmount: Math.floor(Number(broadcast.totalAmount)),
+        description: broadcast.description,
+        submittedBy: broadcast.submittedBy,
+      };
+      // 크루 방송 수익으로 총액 덮어쓰기
+      dailyData.totalAmount = Math.floor(Number(broadcast.totalAmount));
+      const test = Math.floor(Number(broadcast.totalAmount));
+      console.log(test);
+    });
+
+    const res = Array.from(dailyEarnings.values()).sort(
+      (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime(),
+    );
+    console.log('res', res);
+
+    return Array.from(dailyEarnings.values()).sort(
+      (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime(),
+    );
   }
 }
