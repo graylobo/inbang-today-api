@@ -19,7 +19,9 @@ export class CrewRank {
   @Column()
   level: number; // 계급 순서 (낮을수록 높은 계급)
 
-  @ManyToOne(() => Crew, (crew) => crew.ranks)
+  @ManyToOne(() => Crew, (crew) => crew.ranks, {
+    onDelete: 'CASCADE',
+  })
   crew: Crew;
 
   @OneToMany(() => CrewMember, (member) => member.rank)

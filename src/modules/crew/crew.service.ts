@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, HttpException, HttpStatus } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, Between } from 'typeorm';
 import { Crew } from '../../entities/crew.entity';
@@ -49,11 +49,22 @@ export class CrewService {
   }
 
   async create(crewData: any): Promise<Crew> {
+    // 이름 중복 검사
+    const existingCrew = await this.crewRepository.findOne({
+      where: { name: crewData.name },
+    });
+
+    if (existingCrew) {
+      throw new HttpException('Crew name already exists', HttpStatus.CONFLICT);
+    }
+
     const { ranks, ...crewInfo } = crewData;
 
     // 크루 생성 및 저장
     const newCrew = this.crewRepository.create(crewInfo);
-    const savedCrew = await this.crewRepository.save(newCrew);
+    const savedCrew = (await this.crewRepository.save(
+      newCrew,
+    )) as unknown as Crew;
 
     // 계급 생성
     if (ranks && ranks.length > 0) {
@@ -66,11 +77,24 @@ export class CrewService {
       await this.crewRankRepository.save(rankEntities);
     }
 
-    // 저장된 크루의 전체 정보를 조회하여 반환
-    return this.findOne(savedCrew[0].id);
+    return this.findOne(savedCrew.id);
   }
 
   async update(id: number, crewData: any): Promise<Crew> {
+    // 이름이 변경되는 경우에만 중복 검사
+    if (crewData.name) {
+      const existingCrew = await this.crewRepository.findOne({
+        where: { name: crewData.name },
+      });
+
+      if (existingCrew && existingCrew.id !== id) {
+        throw new HttpException(
+          'Crew name already exists',
+          HttpStatus.CONFLICT,
+        );
+      }
+    }
+
     const { ranks, ...crewInfo } = crewData;
 
     // 크루 정보 업데이트

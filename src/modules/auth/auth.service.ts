@@ -28,9 +28,9 @@ export class AuthService {
     });
 
     const payload = { username: currentUser.username, sub: currentUser.id };
-    
+
     const { password, ...userInfo } = currentUser;
-    
+
     return {
       access_token: this.jwtService.sign(payload),
       user: userInfo,
@@ -46,4 +46,4 @@ export class AuthService {
     const user = this.userRepository.create(userData);
     return this.userRepository.save(user);
   }
-} 
+}

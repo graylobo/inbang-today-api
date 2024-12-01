@@ -33,7 +33,9 @@ export class AuthController {
   @Post('register')
   async register(@Body() userData: { username: string; password: string }) {
     try {
-      const hashedPassword = await this.authService.hashPassword(userData.password);
+      const hashedPassword = await this.authService.hashPassword(
+        userData.password,
+      );
       const user = await this.authService.createUser({
         username: userData.username,
         password: hashedPassword,
@@ -52,4 +54,4 @@ export class AuthController {
   getProfile(@Request() req) {
     return req.user;
   }
-} 
+}
