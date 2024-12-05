@@ -16,6 +16,7 @@ import { CrewBroadcast } from './entities/crew-broadcast.entity';
 import { CrawlerModule } from 'src/modules/crawler/crawler.module';
 import { CrewSignature } from 'src/entities/crew-signature.entity';
 import { CrewSignatureModule } from './modules/crew-signature/crew-signature.module';
+import { BoardModule } from './modules/board/board.module';
 
 @Module({
   imports: [
@@ -47,6 +48,7 @@ import { CrewSignatureModule } from './modules/crew-signature/crew-signature.mod
     CrewBroadcastModule,
     CrawlerModule,
     CrewSignatureModule,
+    BoardModule,
   ],
 })
 export class AppModule {}
