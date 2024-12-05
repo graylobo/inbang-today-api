@@ -14,6 +14,8 @@ import { CrewEarningModule } from './modules/crew-earning/crew-earning.module';
 import { CrewBroadcastModule } from './modules/crew-broadcast/crew-broadcast.module';
 import { CrewBroadcast } from './entities/crew-broadcast.entity';
 import { CrawlerModule } from 'src/modules/crawler/crawler.module';
+import { CrewSignature } from 'src/entities/crew-signature.entity';
+import { CrewSignatureModule } from './modules/crew-signature/crew-signature.module';
 
 @Module({
   imports: [
@@ -25,7 +27,15 @@ import { CrawlerModule } from 'src/modules/crawler/crawler.module';
       username: process.env.DB_USERNAME || 'postgres',
       password: process.env.DB_PASSWORD || 'postgres',
       database: process.env.DB_NAME || 'inbang',
-      entities: [Crew, CrewMember, CrewRank, CrewEarning, User, CrewBroadcast],
+      entities: [
+        Crew,
+        CrewMember,
+        CrewRank,
+        CrewEarning,
+        User,
+        CrewBroadcast,
+        CrewSignature,
+      ],
       synchronize: true,
       // logging: true, // SQL 쿼리 로깅 활성화
     }),
@@ -36,6 +46,7 @@ import { CrawlerModule } from 'src/modules/crawler/crawler.module';
     CrewEarningModule,
     CrewBroadcastModule,
     CrawlerModule,
+    CrewSignatureModule,
   ],
 })
 export class AppModule {}

@@ -2,6 +2,7 @@ import { Entity, PrimaryGeneratedColumn, Column, OneToMany } from 'typeorm';
 import { CrewMember } from './crew-member.entity';
 import { CrewRank } from './crew-rank.entity';
 import { CrewBroadcast } from './crew-broadcast.entity';
+import { CrewSignature } from './crew-signature.entity';
 
 @Entity()
 export class Crew {
@@ -25,4 +26,7 @@ export class Crew {
 
   @OneToMany(() => CrewBroadcast, (broadcast) => broadcast.crew)
   broadcasts: CrewBroadcast[];
+
+  @OneToMany(() => CrewSignature, (signature) => signature.crew)
+  signatures: CrewSignature[];
 }
