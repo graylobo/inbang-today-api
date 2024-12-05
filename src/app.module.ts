@@ -13,6 +13,7 @@ import { CrewRankModule } from './modules/crew-rank/crew-rank.module';
 import { CrewEarningModule } from './modules/crew-earning/crew-earning.module';
 import { CrewBroadcastModule } from './modules/crew-broadcast/crew-broadcast.module';
 import { CrewBroadcast } from './entities/crew-broadcast.entity';
+import { CrawlerModule } from 'src/modules/crawler/crawler.module';
 
 @Module({
   imports: [
@@ -34,6 +35,7 @@ import { CrewBroadcast } from './entities/crew-broadcast.entity';
     CrewRankModule,
     CrewEarningModule,
     CrewBroadcastModule,
+    CrawlerModule,
   ],
 })
 export class AppModule {}
