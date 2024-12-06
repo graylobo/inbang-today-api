@@ -17,6 +17,9 @@ import { CrawlerModule } from 'src/modules/crawler/crawler.module';
 import { CrewSignature } from 'src/entities/crew-signature.entity';
 import { CrewSignatureModule } from './modules/crew-signature/crew-signature.module';
 import { BoardModule } from './modules/board/board.module';
+import { Board } from 'src/entities/board.entity';
+import { Post } from 'src/entities/post.entity';
+import { Comment } from 'src/entities/comment.entity';
 
 @Module({
   imports: [
@@ -36,6 +39,9 @@ import { BoardModule } from './modules/board/board.module';
         User,
         CrewBroadcast,
         CrewSignature,
+        Board,
+        Post,
+        Comment,
       ],
       synchronize: true,
       // logging: true, // SQL 쿼리 로깅 활성화

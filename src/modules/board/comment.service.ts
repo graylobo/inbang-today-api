@@ -32,7 +32,10 @@ export class CommentService {
   }
 
   async create(commentData: any): Promise<Comment> {
-    const comments = this.commentRepository.create(commentData);
+    const comments = this.commentRepository.create({
+      ...commentData,
+      post: { id: commentData.postId },
+    });
     const comment = Array.isArray(comments) ? comments[0] : comments;
 
     if (!comment) {

@@ -11,10 +11,14 @@ import {
 import { BoardService } from './board.service';
 import { Board } from '../../entities/board.entity';
 import { AdminGuard } from '../../guards/admin.guard';
+import { BoardSeedService } from './board.seed';
 
 @Controller('boards')
 export class BoardController {
-  constructor(private readonly boardService: BoardService) {}
+  constructor(
+    private readonly boardService: BoardService,
+    private readonly boardSeedService: BoardSeedService,
+  ) {}
 
   @Get()
   async findAll(): Promise<Board[]> {
@@ -51,4 +55,11 @@ export class BoardController {
   async delete(@Param('id') id: string): Promise<void> {
     return this.boardService.delete(+id);
   }
-} 
+
+  //   @UseGuards(AdminGuard)
+  @Post('seed')
+  async seed() {
+    await this.boardSeedService.seed();
+    return { message: '게시판 초기 데이터가 생성되었습니다.' };
+  }
+}

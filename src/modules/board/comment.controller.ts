@@ -28,7 +28,7 @@ export class CommentController {
   @Post()
   async create(@Body() commentData: any, @Request() req: any) {
     const post = await this.postService.findById(commentData.postId);
-    
+
     // 익명 게시판의 글이 아닌 경우 로그인 필요
     if (!post.board.isAnonymous) {
       if (!req.user) {
@@ -48,7 +48,7 @@ export class CommentController {
   ) {
     const parentComment = await this.commentService.findById(+parentId);
     const post = await this.postService.findById(parentComment.post.id);
-    
+
     // 익명 게시판의 글이 아닌 경우 로그인 필요
     if (!post.board.isAnonymous) {
       if (!req.user) {
@@ -67,7 +67,7 @@ export class CommentController {
     @Request() req: any,
   ) {
     const comment = await this.commentService.findById(+id);
-    
+
     // 익명 댓글이 아닌 경우 작성자 확인
     if (comment.author && (!req.user || comment.author.id !== req.user.id)) {
       throw new UnauthorizedException('수정 권한이 없습니다.');
@@ -83,7 +83,7 @@ export class CommentController {
     @Request() req: any,
   ) {
     const comment = await this.commentService.findById(+id);
-    
+
     // 익명 댓글이 아닌 경우 작성자 확인
     if (comment.author && (!req.user || comment.author.id !== req.user.id)) {
       throw new UnauthorizedException('삭제 권한이 없습니다.');
@@ -91,4 +91,4 @@ export class CommentController {
 
     return this.commentService.delete(+id, password);
   }
-} 
+}

@@ -26,21 +26,31 @@ export class PostService {
   async findById(id: number): Promise<Post> {
     const post = await this.postRepository.findOne({
       where: { id },
-      relations: ['author', 'comments', 'comments.author', 'comments.replies'],
+      relations: [
+        'author',
+        'board',
+        'comments',
+        'comments.author',
+        'comments.replies',
+      ],
     });
 
     if (!post) {
       throw new NotFoundException('게시글을 찾을 수 없습니다.');
     }
 
-    // 조회수 증가
-    await this.postRepository.update(id, { viewCount: post.viewCount + 1 });
+    // 조회수 업데이트를 즉시 실행하고 결과를 기다림
+    await this.postRepository.increment({ id }, 'viewCount', 1);
+    post.viewCount += 1; // 현재 객체도 업데이트
 
     return post;
   }
 
   async create(postData: any) {
-    const posts = this.postRepository.create(postData);
+    const posts = this.postRepository.create({
+      ...postData,
+      board: { id: postData.boardId },
+    });
 
     // 익명 게시글인 경우 비밀번호 해시
     const post = Array.isArray(posts) ? posts[0] : posts;

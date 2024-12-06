@@ -9,11 +9,12 @@ import { PostService } from './post.service';
 import { PostController } from './post.controller';
 import { CommentService } from './comment.service';
 import { CommentController } from './comment.controller';
+import { BoardSeedService } from './board.seed';
 
 @Module({
   imports: [TypeOrmModule.forFeature([Board, Post, Comment])],
-  providers: [BoardService, PostService, CommentService],
+  providers: [BoardService, PostService, CommentService, BoardSeedService],
   controllers: [BoardController, PostController, CommentController],
   exports: [BoardService, PostService, CommentService],
 })
-export class BoardModule {} 
+export class BoardModule {}
