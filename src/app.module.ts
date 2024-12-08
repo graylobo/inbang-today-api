@@ -20,6 +20,8 @@ import { BoardModule } from './modules/board/board.module';
 import { Board } from 'src/entities/board.entity';
 import { Post } from 'src/entities/post.entity';
 import { Comment } from 'src/entities/comment.entity';
+import { AppController } from 'src/app.controller';
+import { AppService } from 'src/app.service';
 
 @Module({
   imports: [
@@ -56,5 +58,7 @@ import { Comment } from 'src/entities/comment.entity';
     CrewSignatureModule,
     BoardModule,
   ],
+  controllers: [AppController],
+  providers: [AppService],
 })
 export class AppModule {}

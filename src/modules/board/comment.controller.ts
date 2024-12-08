@@ -12,6 +12,7 @@ import {
 } from '@nestjs/common';
 import { CommentService } from './comment.service';
 import { PostService } from './post.service';
+import * as bcrypt from 'bcrypt';
 
 @Controller('comments')
 export class CommentController {
@@ -90,5 +91,22 @@ export class CommentController {
     }
 
     return this.commentService.delete(+id, password);
+  }
+
+  @Post(':id/verify-password')
+  async verifyPassword(
+    @Param('id') id: string,
+    @Body('password') password: string,
+  ) {
+    const comment = await this.commentService.findById(+id);
+
+    if (
+      !comment.password ||
+      !(await bcrypt.compare(password, comment.password))
+    ) {
+      throw new UnauthorizedException('비밀번호가 일치하지 않습니다.');
+    }
+
+    return { success: true };
   }
 }

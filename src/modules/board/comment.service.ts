@@ -16,19 +16,40 @@ export class CommentService {
   ) {}
 
   async findByPostId(postId: number): Promise<Comment[]> {
-    return this.commentRepository.find({
+    // 한 번의 쿼리로 해당 게시글의 모든 댓글을 가져옴
+    const allComments = await this.commentRepository.find({
       where: {
         post: { id: postId },
-        parent: null,
       },
-      relations: ['author', 'replies', 'replies.author'],
-      order: {
-        createdAt: 'ASC',
-        replies: {
-          createdAt: 'ASC',
-        },
-      },
+      relations: ['author', 'parent'],
+      order: { createdAt: 'ASC' },
     });
+
+    // 댓글 트리 구조 만들기
+    const commentMap = new Map<number, Comment>();
+    const rootComments: Comment[] = [];
+
+    // 먼저 모든 댓글을 Map에 저장
+    allComments.forEach((comment) => {
+      comment.replies = []; // replies 배열 초기화
+      commentMap.set(comment.id, comment);
+    });
+
+    // 부모-자식 관계 설정
+    allComments.forEach((comment) => {
+      if (comment.parent) {
+        // 부모 댓글이 있으면 부모의 replies에 추가
+        const parentComment = commentMap.get(comment.parent.id);
+        if (parentComment) {
+          parentComment.replies.push(comment);
+        }
+      } else {
+        // 최상위 댓글이면 결과 배열에 추가
+        rootComments.push(comment);
+      }
+    });
+
+    return rootComments;
   }
 
   async create(commentData: any): Promise<Comment> {
@@ -107,6 +128,7 @@ export class CommentService {
   async createReply(parentId: number, replyData: any): Promise<Comment> {
     const parent = await this.commentRepository.findOne({
       where: { id: parentId },
+      relations: ['post'],
     });
 
     if (!parent) {
@@ -116,6 +138,7 @@ export class CommentService {
     const replies = this.commentRepository.create({
       ...replyData,
       parent,
+      post: parent.post,
     });
     const reply = Array.isArray(replies) ? replies[0] : replies;
 
