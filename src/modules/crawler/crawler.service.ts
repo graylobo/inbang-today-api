@@ -1,107 +1,132 @@
 import { Injectable } from '@nestjs/common';
 import { chromium } from 'playwright';
+import { StreamInfo } from 'src/modules/crawler/type';
 
 @Injectable()
 export class CrawlerService {
-  async getBroadcasts() {
-    return 'broadcasts';
-  }
+  private readonly CHUNK_SIZE = 50;
+  private readonly MIN_VIEW_COUNT = 10;
+  private readonly LOAD_TIMEOUT = 30000; // 30초
+
   async getAfreecaInfo() {
     console.time('getAfreecaInfo');
-
     const browser = await chromium.launch({
       args: ['--no-sandbox', '--disable-setuid-sandbox'],
     });
 
     try {
       const page = await browser.newPage();
-      page.setDefaultTimeout(0);
-      await page.goto('https://www.sooplive.co.kr/');
+      await page.goto('https://www.sooplive.co.kr/live/all', {
+        timeout: this.LOAD_TIMEOUT,
+        waitUntil: 'networkidle',
+      });
 
-      // 더보기 버튼 45번 클릭
-      //   for (let i = 0; i < 45; i++) {
-      //     await page.locator('div.btn-more > button').waitFor();
-      //     await page.locator('div.btn-more > button').click();
-      //   }
-
-      // XPath 대신 CSS 선택자 사용 (성능상 이점)
-      const idElements = await page
-        .locator('#broadlist_area ul li .cBox-info div a[user_id]')
-        .all();
-      const titleElements = await page
-        .locator('#broadlist_area ul li .cBox-info h3 a')
-        .all();
-      const viewersElements = await page
-        .locator('#broadlist_area ul li .cBox-info div span em')
-        .all();
-      const imgElements = await page
-        .locator('#broadlist_area ul li .thumbs-box a')
-        .all();
-
-      console.log(
-        'idList',
-        idElements.length,
-        'titleList',
-        titleElements.length,
-        'imgList',
-        imgElements.length,
-      );
-
-      // 길이 검증
-      if (
-        ![idElements.length, titleElements.length, imgElements.length].every(
-          (v, i, a) => v === a[0],
-        )
-      ) {
-        throw new Error('idList, titleList, imgList length 불일치');
-      }
-
-      if (idElements.length < 500) {
-        throw new Error('전체방송 수집실패: ' + idElements.length);
-      }
-
-      // 병렬로 데이터 수집 (성능 개선)
-      const idArr = await Promise.all(
-        idElements.map((el) => el.getAttribute('user_id')),
-      );
-
-      const titleArr = await Promise.all(
-        titleElements.map((el) => el.getAttribute('title')),
-      );
-
-      const viewersArr = await Promise.all(
-        viewersElements.map((el) => el.textContent()),
-      );
-
-      const imgArr = await Promise.all(
-        imgElements.map(async (el) => {
-          try {
-            const imgElement = await el.locator('img');
-            if ((await imgElement.count()) === 0) {
-              return el.textContent();
-            }
-            return imgElement.getAttribute('src');
-          } catch {
-            return el.textContent();
-          }
-        }),
-      );
-
-      // 결과 객체 생성
-      const afreecaInfo = idArr.reduce(
-        (acc, id, i) => ({
-          ...acc,
-          [id]: [titleArr[i], imgArr[i], viewersArr[i]],
-        }),
-        {},
-      );
+      await this.loadAllContent(page);
+      const streamInfos = await this.extractAllStreamInfo(page);
 
       console.timeEnd('getAfreecaInfo');
-      return afreecaInfo;
+      return streamInfos;
     } catch (error) {
-      throw new Error('getAfreecaInfo에러: ' + error);
+      console.error('크롤링 실패:', error);
+      throw new Error(`크롤링 실패: ${error.message}`);
     } finally {
       await browser.close();
     }
+  }
+
+  private async loadAllContent(page: any) {
+    while (true) {
+      try {
+        const cards = await page.locator('li[data-type="cBox"]').all();
+        if (cards.length === 0) break;
+
+        const lastCard = cards[cards.length - 1];
+        const viewCountText = await lastCard
+          .locator('[data-testid="view-count"]')
+          .textContent();
+
+        const viewCount = this.parseViewCount(viewCountText);
+        if (viewCount < this.MIN_VIEW_COUNT) break;
+
+        const showMoreButton = await page.locator('.show_more button').first();
+        if (!(await showMoreButton.isVisible())) break;
+
+        await showMoreButton.click();
+        await page.waitForLoadState('networkidle');
+      } catch (error) {
+        console.error('컨텐츠 로딩 중 에러:', error);
+        break;
+      }
+    }
+  }
+
+  private async extractAllStreamInfo(page: any): Promise<StreamInfo[]> {
+    const streamerCards = await page.locator('li[data-type="cBox"]').all();
+    const cardChunks = this.chunkArray(streamerCards, this.CHUNK_SIZE);
+    let allStreamInfos: StreamInfo[] = [];
+
+    for (const chunk of cardChunks) {
+      const chunkInfos = await Promise.all(
+        chunk.map((card) => this.extractStreamInfo(card)),
+      );
+
+      const validChunkInfos = chunkInfos.filter(
+        (info): info is NonNullable<typeof info> =>
+          info !== null &&
+          info.nickname !== '' &&
+          info.title !== '' &&
+          info.viewCount >= 0,
+      );
+
+      allStreamInfos = [...allStreamInfos, ...validChunkInfos];
+    }
+
+    return allStreamInfos;
+  }
+
+  private async extractStreamInfo(card: any): Promise<StreamInfo | null> {
+    try {
+      const [
+        thumbnailSrc,
+        viewCountText,
+        profileUrl,
+        profileImgSrc,
+        nickname,
+        title,
+      ] = await Promise.all([
+        card.locator('.thumbs-box img').first().getAttribute('src'),
+        card.locator('[data-testid="view-count"]').textContent(),
+        card.locator('a.thumb').getAttribute('href'),
+        card.locator('a.thumb img').getAttribute('src'),
+        card.locator('.details .nick span').textContent(),
+        card.locator('h3.title a').getAttribute('title'),
+      ]);
+
+      return {
+        thumbnail: thumbnailSrc || '',
+        viewCount: this.parseViewCount(viewCountText),
+        profileUrl: profileUrl || '',
+        profileImage: profileImgSrc || '',
+        nickname: nickname?.trim() || '',
+        title: title || '',
+        crawledAt: new Date().toISOString(),
+      };
+    } catch (error) {
+      console.error('스트림 정보 추출 실패:', error);
+      return null;
+    }
+  }
+
+  private parseViewCount(viewCount: string | null): number {
+    if (!viewCount) return 0;
+    return parseInt(viewCount.replace(/,/g, ''), 10) || 0;
+  }
+
+  private chunkArray<T>(array: T[], chunkSize: number): T[][] {
+    const chunks: T[][] = [];
+    for (let i = 0; i < array.length; i += chunkSize) {
+      chunks.push(array.slice(i, i + chunkSize));
+    }
+    return chunks;
   }
 }

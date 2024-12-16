@@ -7,6 +7,6 @@ export class CrawlerController {
 
   @Get('broadcasts')
   async getBroadcasts() {
-    return this.crawlerService.getBroadcasts();
+    return this.crawlerService.getAfreecaInfo();
   }
 }
