@@ -22,6 +22,7 @@ import { Post } from 'src/entities/post.entity';
 import { Comment } from 'src/entities/comment.entity';
 import { AppController } from 'src/app.controller';
 import { AppService } from 'src/app.service';
+import { CrewSignatureDance } from 'src/entities/crew-signature-dance.entity';
 
 @Module({
   imports: [
@@ -44,6 +45,7 @@ import { AppService } from 'src/app.service';
         Board,
         Post,
         Comment,
+        CrewSignatureDance,
       ],
       synchronize: true,
       // logging: true, // SQL 쿼리 로깅 활성화
