@@ -1,15 +1,23 @@
 import { Injectable } from '@nestjs/common';
 import { chromium } from 'playwright';
 import { StreamInfo } from 'src/modules/crawler/type';
+import { RedisService } from 'src/modules/redis/redis.service';
 
 @Injectable()
 export class CrawlerService {
-  private readonly CHUNK_SIZE = 50;
-  private readonly MIN_VIEW_COUNT = 10;
-  private readonly LOAD_TIMEOUT = 30000; // 30초
+  constructor(private readonly redisService: RedisService) {}
+  private readonly CHUNK_SIZE = 100;
+  private readonly MIN_VIEW_COUNT = 100;
+  private readonly LOAD_TIMEOUT = 60000;
+  private readonly CACHE_KEY = 'streaming_data';
+  private readonly CACHE_TTL = 70;
 
-  async getAfreecaInfo() {
-    console.time('getAfreecaInfo');
+  async getStreamingData() {
+    const cachedData = (await this.redisService.get(this.CACHE_KEY)) as string;
+    if (cachedData) {
+      return JSON.parse(cachedData);
+    }
+
     const browser = await chromium.launch({
       args: ['--no-sandbox', '--disable-setuid-sandbox'],
     });
@@ -23,9 +31,18 @@ export class CrawlerService {
 
       await this.loadAllContent(page);
       const streamInfos = await this.extractAllStreamInfo(page);
+      const res = {
+        streamInfos,
+        totalCount: streamInfos.length,
+      };
 
-      console.timeEnd('getAfreecaInfo');
-      return streamInfos;
+      await this.redisService.set(
+        this.CACHE_KEY,
+        JSON.stringify(res),
+        this.CACHE_TTL,
+      );
+
+      return res;
     } catch (error) {
       console.error('크롤링 실패:', error);
       throw new Error(`크롤링 실패: ${error.message}`);
@@ -71,11 +88,7 @@ export class CrawlerService {
       );
 
       const validChunkInfos = chunkInfos.filter(
-        (info): info is NonNullable<typeof info> =>
-          info !== null &&
-          info.nickname !== '' &&
-          info.title !== '' &&
-          info.viewCount >= 0,
+        (info) => info !== null && info.nickname !== '' && info.title !== '',
       );
 
       allStreamInfos = [...allStreamInfos, ...validChunkInfos];
@@ -86,30 +99,34 @@ export class CrawlerService {
 
   private async extractStreamInfo(card: any): Promise<StreamInfo | null> {
     try {
-      const [
-        thumbnailSrc,
-        viewCountText,
-        profileUrl,
-        profileImgSrc,
-        nickname,
-        title,
-      ] = await Promise.all([
-        card.locator('.thumbs-box img').first().getAttribute('src'),
-        card.locator('[data-testid="view-count"]').textContent(),
-        card.locator('a.thumb').getAttribute('href'),
-        card.locator('a.thumb img').getAttribute('src'),
-        card.locator('.details .nick span').textContent(),
-        card.locator('h3.title a').getAttribute('title'),
-      ]);
+      // evaluate를 사용하여 한 번에 모든 데이터 추출
+      const data = await card.evaluate((el: any) => {
+        // DOM에서 직접 데이터 추출
+        const thumbnail =
+          el.querySelector('.thumbs-box img')?.getAttribute('src') || '';
+        const viewCount =
+          el.querySelector('[data-testid="view-count"]')?.textContent || '0';
+        const profileUrl =
+          el.querySelector('a.thumb')?.getAttribute('href') || '';
+        const nickname =
+          el.querySelector('.details .nick span')?.textContent?.trim() || '';
+        const title =
+          el.querySelector('h3.title a')?.getAttribute('title') || '';
+
+        return {
+          thumbnail,
+          viewCount,
+          profileUrl,
+          nickname,
+          title,
+        };
+      });
 
       return {
-        thumbnail: thumbnailSrc || '',
-        viewCount: this.parseViewCount(viewCountText),
-        profileUrl: profileUrl || '',
-        profileImage: profileImgSrc || '',
-        nickname: nickname?.trim() || '',
-        title: title || '',
-        crawledAt: new Date().toISOString(),
+        ...data,
+        thumbnail: this.normalizeThumbnailUrl(data.thumbnail),
+        viewCount: this.parseViewCount(data.viewCount),
+        profileImage: this.generateProfileImage(data.profileUrl),
       };
     } catch (error) {
       console.error('스트림 정보 추출 실패:', error);
@@ -128,5 +145,32 @@ export class CrawlerService {
       chunks.push(array.slice(i, i + chunkSize));
     }
     return chunks;
+  }
+
+  private generateProfileImage(profileUrl: string): string {
+    try {
+      // profileUrl에서 채널 ID 추출 (마지막 '/' 이후의 문자열)
+      const channelId = profileUrl.split('/').pop() || '';
+
+      // 첫 두 글자 추출
+      const prefix = channelId.slice(0, 2).toLowerCase();
+
+      // profileImage URL 생성
+      return `https://stimg.sooplive.co.kr/LOGO/${prefix}/${channelId}/m/${channelId}.webp`;
+    } catch (error) {
+      console.error('프로필 이미지 URL 생성 실패:', error);
+      return '';
+    }
+  }
+
+  private normalizeThumbnailUrl(url: string): string {
+    if (!url) return '';
+
+    // URL이 //로 시작하면 https: 추가
+    if (url.startsWith('//')) {
+      return `https:${url}`;
+    }
+
+    return url;
   }
 }
