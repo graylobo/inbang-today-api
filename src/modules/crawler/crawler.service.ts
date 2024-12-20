@@ -1,29 +1,52 @@
 import { Injectable } from '@nestjs/common';
+import { Cron, CronExpression } from '@nestjs/schedule';
 import { chromium } from 'playwright';
+import { TARGET_STREAMERS } from 'src/modules/crawler/metadata';
 import { StreamInfo } from 'src/modules/crawler/type';
 import { RedisService } from 'src/modules/redis/redis.service';
+import { Browser } from 'playwright';
 
 @Injectable()
 export class CrawlerService {
-  constructor(private readonly redisService: RedisService) {}
+  private browser: Browser | null = null;
   private readonly CHUNK_SIZE = 100;
   private readonly MIN_VIEW_COUNT = 100;
   private readonly LOAD_TIMEOUT = 60000;
-  private readonly CACHE_KEY = 'streaming_data';
+  private readonly CACHE_ALL_STREAM_KEY = 'streaming_data';
+  private readonly CACHE_FILTERED_STREAM_KEY = 'filtered_streams';
+
   private readonly CACHE_TTL = 70;
 
+  constructor(private readonly redisService: RedisService) {}
+
+  private async initBrowser() {
+    if (!this.browser) {
+      this.browser = await chromium.launch({
+        args: ['--no-sandbox', '--disable-setuid-sandbox'],
+      });
+    }
+    return this.browser;
+  }
+
+  private async closeBrowser() {
+    if (this.browser) {
+      await this.browser.close();
+      this.browser = null;
+    }
+  }
+
   async getStreamingData() {
-    const cachedData = (await this.redisService.get(this.CACHE_KEY)) as string;
+    const cachedData = (await this.redisService.get(
+      this.CACHE_ALL_STREAM_KEY,
+    )) as string;
     if (cachedData) {
       return JSON.parse(cachedData);
     }
 
-    const browser = await chromium.launch({
-      args: ['--no-sandbox', '--disable-setuid-sandbox'],
-    });
-
     try {
+      const browser = await this.initBrowser();
       const page = await browser.newPage();
+
       await page.goto('https://www.sooplive.co.kr/live/all', {
         timeout: this.LOAD_TIMEOUT,
         waitUntil: 'networkidle',
@@ -31,13 +54,16 @@ export class CrawlerService {
 
       await this.loadAllContent(page);
       const streamInfos = await this.extractAllStreamInfo(page);
+
+      await page.close();
+
       const res = {
         streamInfos,
         totalCount: streamInfos.length,
       };
 
       await this.redisService.set(
-        this.CACHE_KEY,
+        this.CACHE_ALL_STREAM_KEY,
         JSON.stringify(res),
         this.CACHE_TTL,
       );
@@ -46,9 +72,43 @@ export class CrawlerService {
     } catch (error) {
       console.error('크롤링 실패:', error);
       throw new Error(`크롤링 실패: ${error.message}`);
-    } finally {
-      await browser.close();
     }
+  }
+
+  @Cron(CronExpression.EVERY_MINUTE)
+  async handleCron() {
+    console.log('크롤링 시작:', new Date().toISOString());
+    try {
+      const streams = await this.getStreamingData();
+      console.log('스트림 데이터 조회 완료:', streams.totalCount);
+
+      const filteredStreams = await this.getFilteredStreamingData(
+        streams.streamInfos,
+      );
+      console.log('필터링된 스트림 수:', filteredStreams.length);
+
+      await Promise.all([
+        this.redisService.set(
+          this.CACHE_ALL_STREAM_KEY,
+          JSON.stringify(streams),
+          this.CACHE_TTL,
+        ),
+        this.redisService.set(
+          this.CACHE_FILTERED_STREAM_KEY,
+          JSON.stringify(filteredStreams),
+          this.CACHE_TTL,
+        ),
+      ]);
+      console.log('캐시 업데이트 완료');
+    } catch (error) {
+      console.error('크롤링 실패:', error);
+    } finally {
+      await this.closeBrowser();
+    }
+  }
+
+  async onApplicationShutdown() {
+    await this.closeBrowser();
   }
 
   private async loadAllContent(page: any) {
@@ -172,5 +232,11 @@ export class CrawlerService {
     }
 
     return url;
+  }
+
+  private async getFilteredStreamingData(streams): Promise<StreamInfo[]> {
+    return streams.filter((stream) =>
+      TARGET_STREAMERS.includes(stream.profileUrl.split('/').pop() || ''),
+    );
   }
 }
