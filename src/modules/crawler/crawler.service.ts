@@ -1,18 +1,17 @@
-import { forwardRef, Inject, Injectable } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
+import { EventEmitter2 } from '@nestjs/event-emitter';
 import { Cron, CronExpression } from '@nestjs/schedule';
-import { chromium } from 'playwright';
+import { Browser, chromium } from 'playwright';
+import { STREAM_EVENTS } from 'src/events/stream.events';
 import { TARGET_STREAMERS } from 'src/modules/crawler/metadata';
 import { StreamInfo } from 'src/modules/crawler/type';
 import { RedisService } from 'src/modules/redis/redis.service';
-import { Browser } from 'playwright';
-import { LiveStreamGateway } from 'src/gateway/live-streamer.gateway';
 
 @Injectable()
 export class CrawlerService {
   constructor(
     private readonly redisService: RedisService,
-    @Inject(forwardRef(() => LiveStreamGateway))
-    private readonly liveStreamGateway: LiveStreamGateway,
+    private readonly eventEmitter: EventEmitter2,
   ) {}
 
   private browser: Browser | null = null;
@@ -104,7 +103,7 @@ export class CrawlerService {
           this.CACHE_TTL,
         ),
       ]);
-      this.liveStreamGateway.updateClients(streams);
+      this.eventEmitter.emit(STREAM_EVENTS.UPDATE, streams);
       console.log('캐시 업데이트 완료');
     } catch (error) {
       console.error('크롤링 실패:', error);

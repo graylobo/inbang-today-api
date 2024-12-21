@@ -1,22 +1,20 @@
-import { forwardRef, Inject } from '@nestjs/common';
+import { OnEvent } from '@nestjs/event-emitter';
 import {
-  WebSocketGateway,
-  WebSocketServer,
-  SubscribeMessage,
   OnGatewayConnection,
   OnGatewayDisconnect,
+  SubscribeMessage,
+  WebSocketGateway,
+  WebSocketServer,
 } from '@nestjs/websockets';
 import { Server, Socket } from 'socket.io';
+import { STREAM_EVENTS } from 'src/events/stream.events';
 import { CrawlerService } from 'src/modules/crawler/crawler.service';
 
 @WebSocketGateway({ cors: true })
 export class LiveStreamGateway
   implements OnGatewayConnection, OnGatewayDisconnect
 {
-  constructor(
-    @Inject(forwardRef(() => CrawlerService))
-    private readonly crawlerService: CrawlerService,
-  ) {}
+  constructor(private readonly crawlerService: CrawlerService) {}
   @WebSocketServer() server: Server;
 
   async handleConnection(client: Socket) {
@@ -30,6 +28,7 @@ export class LiveStreamGateway
   }
 
   @SubscribeMessage('updateLiveStreamers')
+  @OnEvent(STREAM_EVENTS.UPDATE)
   updateClients(data: any[]): void {
     this.server.emit('updateLiveStreamers', data);
   }
