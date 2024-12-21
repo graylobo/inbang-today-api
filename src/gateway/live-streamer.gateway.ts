@@ -20,7 +20,7 @@ export class LiveStreamGateway
   async handleConnection(client: Socket) {
     console.log(`Client connected: ${client.id}`);
     const currentStreamers = await this.crawlerService.getStreamingData();
-    this.server.emit('updateLiveStreamers', currentStreamers);
+    client.emit('updateLiveStreamers', currentStreamers);
   }
 
   handleDisconnect(client: Socket) {
