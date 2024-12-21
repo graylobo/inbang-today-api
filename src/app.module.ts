@@ -24,11 +24,14 @@ import { CrewRankModule } from './modules/crew-rank/crew-rank.module';
 import { CrewSignatureModule } from './modules/crew-signature/crew-signature.module';
 import { CrewModule } from './modules/crew/crew.module';
 import { ScheduleModule } from '@nestjs/schedule';
+import { LiveStreamModule } from 'src/modules/live-stream/live-stream.module';
+import { EventEmitterModule } from '@nestjs/event-emitter';
 
 @Module({
   imports: [
     ConfigModule.forRoot(),
     ScheduleModule.forRoot(),
+    EventEmitterModule.forRoot(),
     TypeOrmModule.forRoot({
       type: 'postgres',
       host: process.env.DB_HOST || 'localhost',
@@ -61,6 +64,7 @@ import { ScheduleModule } from '@nestjs/schedule';
     CrawlerModule,
     CrewSignatureModule,
     BoardModule,
+    LiveStreamModule,
   ],
   controllers: [AppController],
   providers: [AppService],
