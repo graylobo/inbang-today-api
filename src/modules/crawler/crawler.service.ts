@@ -39,12 +39,14 @@ export class CrawlerService {
     }
   }
 
-  async getStreamingData() {
-    const cachedData = (await this.redisService.get(
-      this.CACHE_ALL_STREAM_KEY,
-    )) as string;
-    if (cachedData) {
-      return JSON.parse(cachedData);
+  async getStreamingData({ useCache = true }: { useCache?: boolean } = {}) {
+    if (useCache) {
+      const cachedData = (await this.redisService.get(
+        this.CACHE_ALL_STREAM_KEY,
+      )) as string;
+      if (cachedData) {
+        return JSON.parse(cachedData);
+      }
     }
 
     try {
@@ -83,7 +85,7 @@ export class CrawlerService {
   async handleCron() {
     console.log('크롤링 시작:', new Date().toISOString());
     try {
-      const streams = await this.getStreamingData();
+      const streams = await this.getStreamingData({ useCache: false });
       console.log('스트림 데이터 조회 완료:', streams.totalCount);
 
       const filteredStreams = await this.getFilteredStreamingData(
