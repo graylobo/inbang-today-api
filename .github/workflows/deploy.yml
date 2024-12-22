@@ -17,13 +17,13 @@ jobs:
       - name: Deploy to main server
         uses: appleboy/ssh-action@master
         with:
-          host: ${{ secrets.ARTST_DEV_APP_HOST }}
-          username: ${{ secrets.ARTST_DEV_APP_USERNAME }}
-          key: ${{ secrets.ARTST_DEV_SSH_KEY }}
-          port: ${{ secrets.ARTST_DEV_SSH_PORT }}
-          proxy_host: ${{ secrets.ARTST_DEV_BASTION_HOST }}
-          proxy_username: ${{ secrets.ARTST_DEV_BASTION_USERNAME }}
-          proxy_key: ${{ secrets.ARTST_DEV_BASTION_SSH_KEY }}
+          host: ${{ secrets.INBANG_SERVER_HOST }}
+          username: ${{ secrets.INBANG_SERVER_USERNAME }}
+          key: ${{ secrets.INBANG_SERVER_SSH_KEY }}
+          port: ${{ secrets.INBANG_SERVER_SSH_PORT }}
+          proxy_host: ${{ secrets.INBANG_SERVER_BASTION_HOST }}
+          proxy_username: ${{ secrets.INBANG_SERVER_BASTION_USERNAME }}
+          proxy_key: ${{ secrets.INBANG_SERVER_BASTION_SSH_KEY }}
           script: |
             cd ~/src/next-app/ &&
             git pull &&
