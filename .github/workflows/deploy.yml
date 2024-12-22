@@ -25,9 +25,9 @@ jobs:
           proxy_username: ${{ secrets.INBANG_SERVER_BASTION_USERNAME }}
           proxy_key: ${{ secrets.INBANG_SERVER_BASTION_SSH_KEY }}
           script: |
-            cd ~/src/next-app/ &&
+            cd ~/src/inbang-today-api/ &&
             git pull &&
             npm install &&
             npm run build &&
-            pm2 restart next-app &&
+            pm2 restart inbang-today-api &&
             echo DEPLOY ON SERVER DONE SUCCESSFULLY...
