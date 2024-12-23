@@ -27,18 +27,30 @@ import { ScheduleModule } from '@nestjs/schedule';
 import { LiveStreamModule } from 'src/modules/live-stream/live-stream.module';
 import { EventEmitterModule } from '@nestjs/event-emitter';
 
+console.log('process.env.DB_HOST', process.env.NODE_ENV);
 @Module({
   imports: [
-    ConfigModule.forRoot(),
+    ConfigModule.forRoot({
+      envFilePath: (() => {
+        switch (process.env.NODE_ENV) {
+          case 'development':
+            return '.env.production';
+          case 'production':
+            return '.env.production';
+          default:
+            return '.env';
+        }
+      })(),
+    }),
     ScheduleModule.forRoot(),
     EventEmitterModule.forRoot(),
     TypeOrmModule.forRoot({
       type: 'postgres',
-      host: process.env.DB_HOST || 'localhost',
-      port: parseInt(process.env.DB_PORT) || 5432,
-      username: process.env.DB_USERNAME || 'postgres',
-      password: process.env.DB_PASSWORD || 'postgres',
-      database: process.env.DB_NAME || 'inbang',
+      host: process.env.DB_HOST,
+      port: parseInt(process.env.DB_PORT),
+      username: process.env.DB_USERNAME,
+      password: process.env.DB_PASSWORD,
+      database: process.env.DB_NAME,
       entities: [
         Crew,
         CrewMember,
@@ -70,3 +82,4 @@ import { EventEmitterModule } from '@nestjs/event-emitter';
   providers: [AppService],
 })
 export class AppModule {}
+console.log('process.env.DB_HOST', process.env.DB_HOST);
