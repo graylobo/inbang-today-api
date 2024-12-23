@@ -1,3 +1,0 @@
-mkdir client
-cd client
-npm install @tanstack/react-query @tanstack/react-query-devtools axios zustand @types/react @types/react-dom @types/node -D @tailwindcss/forms
