@@ -51,6 +51,7 @@ console.log('process.env.DB_HOST', process.env.NODE_ENV);
       username: process.env.DB_USERNAME,
       password: process.env.DB_PASSWORD,
       database: process.env.DB_NAME,
+      ssl: false,
       entities: [
         Crew,
         CrewMember,
