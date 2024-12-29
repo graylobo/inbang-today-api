@@ -34,7 +34,7 @@ console.log('process.env.DB_HOST', process.env.NODE_ENV);
       envFilePath: (() => {
         switch (process.env.NODE_ENV) {
           case 'development':
-            return '.env.production';
+            return '.env.development';
           case 'production':
             return '.env.production';
           default:
@@ -51,12 +51,14 @@ console.log('process.env.DB_HOST', process.env.NODE_ENV);
       username: process.env.DB_USERNAME,
       password: process.env.DB_PASSWORD,
       database: process.env.DB_NAME,
-      ssl: {
-        ca: 'global-bundle.pem',
-      },
-      extra: {
-        ssl: { rejectUnauthorized: false },
-      },
+      ...(process.env.NODE_ENV === 'production' && {
+        ssl: {
+          ca: 'global-bundle.pem',
+        },
+        extra: {
+          ssl: { rejectUnauthorized: false },
+        },
+      }),
       entities: [
         Crew,
         CrewMember,
