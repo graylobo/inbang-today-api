@@ -139,64 +139,64 @@ export class CrawlerService {
   }
 
   async saveMatchData(query: GetSaveMatchDataDto, batchSize: number = 1000) {
-    const matchData = await this.getMatchHistory(
-      query.startDate,
-      query.endDate,
-    );
+    try {
+      const matchData = await this.getMatchHistory(
+        query.startDate,
+        query.endDate,
+      );
 
-    // 1. 모든 스트리머 정보 파싱 및 중복 제거
-    const parsedStreamers = new Map();
-    matchData.forEach((match) => {
-      ['winner', 'loser'].forEach((role) => {
-        const fullName = match[role];
-        const parsed = this.parseStreamerNameAndRace(fullName);
-        parsedStreamers.set(parsed.name, parsed);
+      // 1. 스트리머 정보 파싱 및 중복 제거
+      const parsedStreamers = new Map();
+      matchData.forEach((match) => {
+        ['winner', 'loser'].forEach((role) => {
+          const fullName = match[role];
+          const parsed = this.parseStreamerNameAndRace(fullName);
+          parsedStreamers.set(parsed.name, parsed);
+        });
       });
-    });
 
-    // 2. 맵 이름 중복 제거
-    const uniqueMaps = new Set(matchData.map((m) => m.map));
+      // 2. 맵 이름 중복 제거
+      const uniqueMaps = new Set(matchData.map((m) => m.map));
 
-    // 3. 기존 데이터 일괄 조회
-    const [existingStreamers, existingMaps] = await Promise.all([
-      this.streamerRepository.find({
-        where: { name: In([...parsedStreamers.keys()]) },
-      }),
-      this.starCraftMapRepository.find({
-        where: { name: In([...uniqueMaps]) },
-      }),
-    ]);
+      // 3. 기존 데이터 일괄 조회
+      const [existingStreamers, existingMaps] = await Promise.all([
+        this.streamerRepository.find({
+          where: { name: In([...parsedStreamers.keys()]) },
+        }),
+        this.starCraftMapRepository.find({
+          where: { name: In([...uniqueMaps]) },
+        }),
+      ]);
 
-    // 4. 캐시 맵 생성
-    const existingStreamerMapCache = new Map(
-      existingStreamers.map((s) => [s.name, s]),
-    );
-    const existingMapCache = new Map(existingMaps.map((m) => [m.name, m]));
+      // 4. 캐시 맵 생성
+      const existingStreamerMapCache = new Map(
+        existingStreamers.map((s) => [s.name, s]),
+      );
+      const existingMapCache = new Map(existingMaps.map((m) => [m.name, m]));
 
-    // 5. db에 존재하지 않는 새로운 스트리머 insert
-    const streamersToCreate = [...parsedStreamers.values()].filter(
-      ({ name }) => !existingStreamerMapCache.has(name),
-    );
+      // 5. 새로운 스트리머 생성
+      const streamersToCreate = [...parsedStreamers.values()].filter(
+        ({ name }) => !existingStreamerMapCache.has(name),
+      );
 
-    if (streamersToCreate.length > 0) {
-      const newStreamers =
-        await this.streamerRepository.save(streamersToCreate);
-      newStreamers.forEach((s) => existingStreamerMapCache.set(s.name, s));
-    }
+      if (streamersToCreate.length > 0) {
+        const newStreamers =
+          await this.streamerRepository.save(streamersToCreate);
+        newStreamers.forEach((s) => existingStreamerMapCache.set(s.name, s));
+      }
 
-    // 6. db에 존재하지 않는 새로운 맵 insert
-    const mapsToCreate = [...uniqueMaps]
-      .filter((name) => !existingMapCache.has(name))
-      .map((name) => ({ name }));
+      // 6. 새로운 맵 생성
+      const mapsToCreate = [...uniqueMaps]
+        .filter((name) => !existingMapCache.has(name))
+        .map((name) => ({ name }));
 
-    if (mapsToCreate.length > 0) {
-      const newMaps = await this.starCraftMapRepository.save(mapsToCreate);
-      newMaps.forEach((m) => existingMapCache.set(m.name, m));
-    }
+      if (mapsToCreate.length > 0) {
+        const newMaps = await this.starCraftMapRepository.save(mapsToCreate);
+        newMaps.forEach((m) => existingMapCache.set(m.name, m));
+      }
 
-    // 7. 매치 해시 일괄 생성 및 중복 체크
-    const matchHashes = await Promise.all(
-      matchData.map(async (element) => {
+      // 7. 매치 해시 생성
+      const matchHashes = matchData.map((element) => {
         const { date, winner, loser, map, elo, format, memo } = element;
         const { name: winnerName } = this.parseStreamerNameAndRace(winner);
         const { name: loserName } = this.parseStreamerNameAndRace(loser);
@@ -213,39 +213,57 @@ export class CrawlerService {
           }),
           data: { date, winnerName, loserName, map, elo, format, memo },
         };
-      }),
-    );
-
-    const existingHashes = await this.starCraftGameMatchRepository.find({
-      where: { uniqueHash: In(matchHashes.map((m) => m.hash)) },
-      select: ['uniqueHash'],
-    });
-
-    const existingHashSet = new Set(existingHashes.map((m) => m.uniqueHash));
-
-    // 8. 새로운 매치 생성 및 배치 저장
-    const newMatches = matchHashes
-      .filter(({ hash }) => !existingHashSet.has(hash))
-      .map(({ hash, data }) => {
-        const match = new StarCraftGameMatch();
-        match.date = new Date(data.date);
-        match.winner = existingStreamerMapCache.get(data.winnerName);
-        match.loser = existingStreamerMapCache.get(data.loserName);
-        match.map = existingMapCache.get(data.map);
-        match.eloPoint = data.elo;
-        match.format = data.format;
-        match.memo = data.memo;
-        match.uniqueHash = hash;
-        return match;
       });
 
-    // 9. 배치 단위로 저장
-    for (let i = 0; i < newMatches.length; i += batchSize) {
-      const batch = newMatches.slice(i, i + batchSize);
-      await this.starCraftGameMatchRepository.save(batch);
-    }
+      // 8. 중복 제거를 위한 Set 생성
+      const uniqueHashes = new Set();
+      const uniqueMatches = [];
 
-    return true;
+      // 9. 중복 없는 매치 데이터만 생성
+      for (const { hash, data } of matchHashes) {
+        if (!uniqueHashes.has(hash)) {
+          uniqueHashes.add(hash);
+          const match = new StarCraftGameMatch();
+          match.date = new Date(data.date);
+          match.winner = existingStreamerMapCache.get(data.winnerName);
+          match.loser = existingStreamerMapCache.get(data.loserName);
+          match.map = existingMapCache.get(data.map);
+          match.eloPoint = data.elo;
+          match.format = data.format;
+          match.memo = data.memo;
+          match.uniqueHash = hash;
+          uniqueMatches.push(match);
+        }
+      }
+
+      // 10. 배치 단위로 저장 (트랜잭션 사용)
+      for (let i = 0; i < uniqueMatches.length; i += batchSize) {
+        const batch = uniqueMatches.slice(i, i + batchSize);
+        await this.starCraftGameMatchRepository.manager.transaction(
+          async (manager) => {
+            // 이미 존재하는 해시 확인
+            const existingHashes = await manager.find(StarCraftGameMatch, {
+              where: { uniqueHash: In(batch.map((m) => m.uniqueHash)) },
+              select: ['uniqueHash'],
+            });
+
+            // 중복되지 않은 매치만 저장
+            const hashSet = new Set(existingHashes.map((m) => m.uniqueHash));
+            const newBatch = batch.filter(
+              (match) => !hashSet.has(match.uniqueHash),
+            );
+
+            if (newBatch.length > 0) {
+              await manager.save(StarCraftGameMatch, newBatch);
+            }
+          },
+        );
+      }
+
+      return true;
+    } catch (error) {
+      throw new Error(`매치 데이터 저장 중 오류 발생: ${error.message}`);
+    }
   }
   private parseMatchData(html: string) {
     const $ = cheerio.load(html);
