@@ -1,13 +1,13 @@
 import { DataSource } from 'typeorm';
 import { Crew } from '../../entities/crew.entity';
 import { CrewRank } from '../../entities/crew-rank.entity';
-import { CrewMember } from '../../entities/crew-member.entity';
+import { Streamer } from '../../entities/streamer.entity';
 
 export async function seedInitialData(dataSource: DataSource) {
   // 크루 생성
   const crewRepository = dataSource.getRepository(Crew);
   const rankRepository = dataSource.getRepository(CrewRank);
-  const memberRepository = dataSource.getRepository(CrewMember);
+  const memberRepository = dataSource.getRepository(Streamer);
 
   // 크루 A 생성
   const crewA = await crewRepository.save({
@@ -62,4 +62,4 @@ export async function seedInitialData(dataSource: DataSource) {
     { name: '정평민', crew: crewB, rank: crewBRanks[4] },
     { name: '강농노', crew: crewB, rank: crewBRanks[5] },
   ]);
-} 
+}

@@ -1,5 +1,6 @@
-import { Controller, Get } from '@nestjs/common';
+import { Controller, Get, Query } from '@nestjs/common';
 import { CrawlerService } from 'src/modules/crawler/crawler.service';
+import { GetSaveMatchDataDto } from 'src/modules/crawler/dto/request/get-save-match-data.dto';
 
 @Controller('crawler')
 export class CrawlerController {
@@ -8,5 +9,15 @@ export class CrawlerController {
   @Get('broadcasts')
   async getBroadcasts() {
     return this.crawlerService.getStreamingData();
+  }
+
+  @Get('match-history')
+  async getMatchHistory(@Query() query: GetSaveMatchDataDto) {
+    return this.crawlerService.getMatchHistory(query.startDate, query.endDate);
+  }
+
+  @Get('save-match-data')
+  async saveMatchData(@Query() query: GetSaveMatchDataDto) {
+    return this.crawlerService.saveMatchData(query);
   }
 }

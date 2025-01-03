@@ -1,17 +1,44 @@
+import { HttpService } from '@nestjs/axios';
 import { Injectable } from '@nestjs/common';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { Cron, CronExpression } from '@nestjs/schedule';
 import { Browser, chromium } from 'playwright';
+import { firstValueFrom } from 'rxjs';
 import { STREAM_EVENTS } from 'src/events/stream.events';
 import { TARGET_STREAMERS } from 'src/modules/crawler/metadata';
 import { StreamInfo } from 'src/modules/crawler/type';
 import { RedisService } from 'src/modules/redis/redis.service';
+import * as cheerio from 'cheerio';
+import { Repository } from 'typeorm';
+import { Streamer } from 'src/entities/streamer.entity';
+import { InjectRepository } from '@nestjs/typeorm';
+import { StarCraftGameMatch } from 'src/entities/starcraft-game-match.entity';
+import { StarCraftMap } from 'src/entities/starcraft-map.entity';
+import { findOrCreate } from 'src/utils';
+import { GetSaveMatchDataDto } from 'src/modules/crawler/dto/request/get-save-match-data.dto';
+
+export interface MatchData {
+  date: string;
+  winner: string;
+  loser: string;
+  map: string;
+  elo: number;
+  format: string;
+  memo: string;
+}
 
 @Injectable()
 export class CrawlerService {
   constructor(
+    @InjectRepository(Streamer)
+    private readonly streamerRepository: Repository<Streamer>,
+    @InjectRepository(StarCraftMap)
+    private readonly starCraftMapRepository: Repository<StarCraftMap>,
+    @InjectRepository(StarCraftGameMatch)
+    private readonly starCraftGameMatchRepository: Repository<StarCraftGameMatch>,
     private readonly redisService: RedisService,
     private readonly eventEmitter: EventEmitter2,
+    private readonly httpService: HttpService,
   ) {}
 
   private browser: Browser | null = null;
@@ -81,7 +108,105 @@ export class CrawlerService {
     }
   }
 
-  @Cron(CronExpression.EVERY_MINUTE)
+  async getMatchHistory(startDate: string, endDate: string) {
+    try {
+      const formData = new URLSearchParams({
+        wr_1: startDate,
+        wr_2: endDate,
+      });
+
+      const response = await firstValueFrom(
+        this.httpService.post(
+          'https://eloboard.com/men/bbs/search_bj_list.php',
+          formData.toString(),
+          {
+            headers: {
+              'Content-Type': 'application/x-www-form-urlencoded',
+              'User-Agent':
+                'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+            },
+          },
+        ),
+      );
+
+      // return response.data;
+      return this.parseMatchData(response.data);
+    } catch (error) {
+      console.error('전적 조회 실패:', error);
+      throw new Error(`전적 조회 실패: ${error.message}`);
+    }
+  }
+
+  async saveMatchData(query: GetSaveMatchDataDto) {
+    const matchData = await this.getMatchHistory(
+      query.startDate,
+      query.endDate,
+    );
+    for (const element of matchData) {
+      const { date, winner, loser, map, elo, format, memo } = element;
+      const winnerStreamer = await findOrCreate(this.streamerRepository, {
+        name: winner,
+      });
+      const loserStreamer = await findOrCreate(this.streamerRepository, {
+        name: loser,
+      });
+
+      const matchMap = await findOrCreate(this.starCraftMapRepository, {
+        name: map,
+      });
+
+      const uniqueHash = StarCraftGameMatch.generateHash({
+        date: new Date(date),
+        winner,
+        loser,
+        map,
+        format,
+        memo,
+        eloPoint: elo,
+      });
+
+      const existingMatch = await this.starCraftGameMatchRepository.findOne({
+        where: { uniqueHash },
+      });
+
+      if (existingMatch) {
+        console.log(`이미 존재하는 매치: ${uniqueHash}`);
+        continue;
+      }
+
+      const match = new StarCraftGameMatch();
+      match.date = new Date(date);
+      match.winner = winnerStreamer;
+      match.loser = loserStreamer;
+      match.map = matchMap;
+      match.eloPoint = elo;
+      match.format = format;
+      match.memo = memo;
+
+      await this.starCraftGameMatchRepository.save(match);
+    }
+  }
+  private parseMatchData(html: string) {
+    const $ = cheerio.load(html);
+    const matches: MatchData[] = [];
+
+    $('table.table tbody tr').each((_, row) => {
+      const match: MatchData = {
+        date: $(row).find('td:nth-child(1)').text().trim(),
+        winner: $(row).find('td:nth-child(2)').text().trim(),
+        loser: $(row).find('td:nth-child(3)').text().trim(),
+        map: $(row).find('td:nth-child(4)').text().trim(),
+        elo: parseFloat($(row).find('td:nth-child(5)').text().trim()),
+        format: $(row).find('td:nth-child(6)').text().trim(),
+        memo: $(row).find('td:nth-child(7)').text().trim(),
+      };
+
+      matches.push(match);
+    });
+
+    return matches;
+  }
+  // @Cron(CronExpression.EVERY_MINUTE)
   async handleCron() {
     console.log('크롤링 시작:', new Date().toISOString());
     try {

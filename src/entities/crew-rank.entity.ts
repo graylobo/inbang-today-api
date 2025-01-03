@@ -5,7 +5,7 @@ import {
   ManyToOne,
   OneToMany,
 } from 'typeorm';
-import { CrewMember } from './crew-member.entity';
+import { Streamer } from './streamer.entity';
 import { Crew } from './crew.entity';
 
 @Entity()
@@ -24,6 +24,6 @@ export class CrewRank {
   })
   crew: Crew;
 
-  @OneToMany(() => CrewMember, (member) => member.rank)
-  members: CrewMember[];
+  @OneToMany(() => Streamer, (member) => member.rank)
+  members: Streamer[];
 }

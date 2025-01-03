@@ -1,7 +1,7 @@
 import { DataSource } from 'typeorm';
 import { Crew } from '../../entities/crew.entity';
 import { CrewRank } from '../../entities/crew-rank.entity';
-import { CrewMember } from '../../entities/crew-member.entity';
+import { Streamer } from '../../entities/streamer.entity';
 import { CrewEarning } from '../../entities/crew-earning.entity';
 import { seedInitialData } from './initial.seed';
 import * as dotenv from 'dotenv';
@@ -15,7 +15,7 @@ const dataSource = new DataSource({
   username: process.env.DB_USERNAME || 'postgres',
   password: process.env.DB_PASSWORD || 'postgres',
   database: process.env.DB_NAME || 'inbang',
-  entities: [Crew, CrewMember, CrewRank, CrewEarning],
+  entities: [Crew, Streamer, CrewRank, CrewEarning],
   synchronize: true,
 });
 

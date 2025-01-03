@@ -6,7 +6,7 @@ import {
   CreateDateColumn,
 } from 'typeorm';
 import { CrewSignature } from './crew-signature.entity';
-import { CrewMember } from './crew-member.entity';
+import { Streamer } from './streamer.entity';
 
 @Entity()
 export class CrewSignatureDance {
@@ -18,8 +18,8 @@ export class CrewSignatureDance {
   })
   signature: CrewSignature;
 
-  @ManyToOne(() => CrewMember)
-  member: CrewMember;
+  @ManyToOne(() => Streamer)
+  member: Streamer;
 
   @Column({ type: 'text' })
   danceVideoUrl: string;

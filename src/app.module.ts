@@ -11,7 +11,7 @@ import { Post } from 'src/entities/post.entity';
 import { CrawlerModule } from 'src/modules/crawler/crawler.module';
 import { CrewBroadcast } from './entities/crew-broadcast.entity';
 import { CrewEarning } from './entities/crew-earning.entity';
-import { CrewMember } from './entities/crew-member.entity';
+import { Streamer } from './entities/streamer.entity';
 import { CrewRank } from './entities/crew-rank.entity';
 import { Crew } from './entities/crew.entity';
 import { User } from './entities/user.entity';
@@ -26,6 +26,8 @@ import { CrewModule } from './modules/crew/crew.module';
 import { ScheduleModule } from '@nestjs/schedule';
 import { LiveStreamModule } from 'src/modules/live-stream/live-stream.module';
 import { EventEmitterModule } from '@nestjs/event-emitter';
+import { StarCraftGameMatch } from 'src/entities/starcraft-game-match.entity';
+import { StarCraftMap } from 'src/entities/starcraft-map.entity';
 
 console.log('process.env.DB_HOST', process.env.NODE_ENV);
 @Module({
@@ -61,7 +63,7 @@ console.log('process.env.DB_HOST', process.env.NODE_ENV);
       }),
       entities: [
         Crew,
-        CrewMember,
+        Streamer,
         CrewRank,
         CrewEarning,
         User,
@@ -71,6 +73,8 @@ console.log('process.env.DB_HOST', process.env.NODE_ENV);
         Post,
         Comment,
         CrewSignatureDance,
+        StarCraftGameMatch,
+        StarCraftMap,
       ],
       synchronize: true,
       // logging: true, // SQL 쿼리 로깅 활성화

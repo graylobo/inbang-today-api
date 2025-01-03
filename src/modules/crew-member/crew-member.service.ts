@@ -5,16 +5,16 @@ import {
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import { CrewMember } from '../../entities/crew-member.entity';
+import { Streamer } from '../../entities/streamer.entity';
 
 @Injectable()
 export class CrewMemberService {
   constructor(
-    @InjectRepository(CrewMember)
-    private crewMemberRepository: Repository<CrewMember>,
+    @InjectRepository(Streamer)
+    private crewMemberRepository: Repository<Streamer>,
   ) {}
 
-  async findAll(): Promise<CrewMember[]> {
+  async findAll(): Promise<Streamer[]> {
     return this.crewMemberRepository.find({
       relations: ['crew', 'rank'],
       order: {
@@ -24,7 +24,7 @@ export class CrewMemberService {
     });
   }
 
-  async findAllByCrewId(crewId: number): Promise<CrewMember[]> {
+  async findAllByCrewId(crewId: number): Promise<Streamer[]> {
     return this.crewMemberRepository.find({
       where: { crew: { id: crewId } },
       relations: ['rank', 'crew'],
@@ -32,14 +32,14 @@ export class CrewMemberService {
     });
   }
 
-  async findOne(id: number): Promise<CrewMember> {
+  async findOne(id: number): Promise<Streamer> {
     return this.crewMemberRepository.findOne({
       where: { id },
       relations: ['rank', 'crew'],
     });
   }
 
-  async create(memberData: any): Promise<CrewMember> {
+  async create(memberData: any): Promise<Streamer> {
     const member = this.crewMemberRepository.create({
       name: memberData.name,
       profileImageUrl: memberData.profileImageUrl,
@@ -50,7 +50,7 @@ export class CrewMemberService {
     return this.crewMemberRepository.save(member);
   }
 
-  async update(id: number, memberData: any): Promise<CrewMember> {
+  async update(id: number, memberData: any): Promise<Streamer> {
     const updateData: any = {
       name: memberData.name,
       profileImageUrl: memberData.profileImageUrl,

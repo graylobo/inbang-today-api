@@ -5,7 +5,7 @@ import {
   ManyToOne,
   CreateDateColumn,
 } from 'typeorm';
-import { CrewMember } from './crew-member.entity';
+import { Streamer } from './streamer.entity';
 import { User } from './user.entity';
 
 @Entity()
@@ -13,8 +13,8 @@ export class CrewEarning {
   @PrimaryGeneratedColumn()
   id: number;
 
-  @ManyToOne(() => CrewMember, { eager: true, onDelete: 'CASCADE' })
-  member: CrewMember;
+  @ManyToOne(() => Streamer, { eager: true, onDelete: 'CASCADE' })
+  member: Streamer;
 
   @ManyToOne(() => User, { eager: true })
   submittedBy: User;

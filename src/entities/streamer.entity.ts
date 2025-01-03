@@ -8,9 +8,10 @@ import {
 import { Crew } from './crew.entity';
 import { CrewRank } from './crew-rank.entity';
 import { CrewEarning } from './crew-earning.entity';
+import { StarCraftRace } from 'src/entities/types/streamer.type';
 
 @Entity()
-export class CrewMember {
+export class Streamer {
   @PrimaryGeneratedColumn()
   id: number;
 
@@ -31,4 +32,14 @@ export class CrewMember {
 
   @OneToMany(() => CrewEarning, (earning) => earning.member)
   earnings: CrewEarning[];
+
+  @Column({
+    type: 'enum',
+    enum: StarCraftRace,
+    nullable: true,
+  })
+  race: StarCraftRace;
+
+  @Column({ nullable: true })
+  tier: string;
 }

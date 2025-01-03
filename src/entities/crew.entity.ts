@@ -1,5 +1,5 @@
 import { Entity, PrimaryGeneratedColumn, Column, OneToMany } from 'typeorm';
-import { CrewMember } from './crew-member.entity';
+import { Streamer } from './streamer.entity';
 import { CrewRank } from './crew-rank.entity';
 import { CrewBroadcast } from './crew-broadcast.entity';
 import { CrewSignature } from './crew-signature.entity';
@@ -18,8 +18,8 @@ export class Crew {
   @Column({ nullable: true })
   iconUrl: string;
 
-  @OneToMany(() => CrewMember, (member) => member.crew)
-  members: CrewMember[];
+  @OneToMany(() => Streamer, (member) => member.crew)
+  members: Streamer[];
 
   @OneToMany(() => CrewRank, (rank) => rank.crew)
   ranks: CrewRank[];
