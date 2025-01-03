@@ -9,13 +9,14 @@ import { TARGET_STREAMERS } from 'src/modules/crawler/metadata';
 import { StreamInfo } from 'src/modules/crawler/type';
 import { RedisService } from 'src/modules/redis/redis.service';
 import * as cheerio from 'cheerio';
-import { Repository } from 'typeorm';
+import { In, Repository } from 'typeorm';
 import { Streamer } from 'src/entities/streamer.entity';
 import { InjectRepository } from '@nestjs/typeorm';
 import { StarCraftGameMatch } from 'src/entities/starcraft-game-match.entity';
 import { StarCraftMap } from 'src/entities/starcraft-map.entity';
 import { findOrCreate } from 'src/utils';
 import { GetSaveMatchDataDto } from 'src/modules/crawler/dto/request/get-save-match-data.dto';
+import { StarCraftRace } from 'src/entities/types/streamer.type';
 
 export interface MatchData {
   date: string;
@@ -137,54 +138,114 @@ export class CrawlerService {
     }
   }
 
-  async saveMatchData(query: GetSaveMatchDataDto) {
+  async saveMatchData(query: GetSaveMatchDataDto, batchSize: number = 1000) {
     const matchData = await this.getMatchHistory(
       query.startDate,
       query.endDate,
     );
-    for (const element of matchData) {
-      const { date, winner, loser, map, elo, format, memo } = element;
-      const winnerStreamer = await findOrCreate(this.streamerRepository, {
-        name: winner,
+
+    // 1. 모든 스트리머 정보 파싱 및 중복 제거
+    const parsedStreamers = new Map();
+    matchData.forEach((match) => {
+      ['winner', 'loser'].forEach((role) => {
+        const fullName = match[role];
+        const parsed = this.parseStreamerNameAndRace(fullName);
+        parsedStreamers.set(parsed.name, parsed);
       });
-      const loserStreamer = await findOrCreate(this.streamerRepository, {
-        name: loser,
-      });
+    });
 
-      const matchMap = await findOrCreate(this.starCraftMapRepository, {
-        name: map,
-      });
+    // 2. 맵 이름 중복 제거
+    const uniqueMaps = new Set(matchData.map((m) => m.map));
 
-      const uniqueHash = StarCraftGameMatch.generateHash({
-        date: new Date(date),
-        winner,
-        loser,
-        map,
-        format,
-        memo,
-        eloPoint: elo,
-      });
+    // 3. 기존 데이터 일괄 조회
+    const [existingStreamers, existingMaps] = await Promise.all([
+      this.streamerRepository.find({
+        where: { name: In([...parsedStreamers.keys()]) },
+      }),
+      this.starCraftMapRepository.find({
+        where: { name: In([...uniqueMaps]) },
+      }),
+    ]);
 
-      const existingMatch = await this.starCraftGameMatchRepository.findOne({
-        where: { uniqueHash },
-      });
+    // 4. 캐시 맵 생성
+    const existingStreamerMapCache = new Map(
+      existingStreamers.map((s) => [s.name, s]),
+    );
+    const existingMapCache = new Map(existingMaps.map((m) => [m.name, m]));
 
-      if (existingMatch) {
-        console.log(`이미 존재하는 매치: ${uniqueHash}`);
-        continue;
-      }
+    // 5. db에 존재하지 않는 새로운 스트리머 insert
+    const streamersToCreate = [...parsedStreamers.values()].filter(
+      ({ name }) => !existingStreamerMapCache.has(name),
+    );
 
-      const match = new StarCraftGameMatch();
-      match.date = new Date(date);
-      match.winner = winnerStreamer;
-      match.loser = loserStreamer;
-      match.map = matchMap;
-      match.eloPoint = elo;
-      match.format = format;
-      match.memo = memo;
-
-      await this.starCraftGameMatchRepository.save(match);
+    if (streamersToCreate.length > 0) {
+      const newStreamers =
+        await this.streamerRepository.save(streamersToCreate);
+      newStreamers.forEach((s) => existingStreamerMapCache.set(s.name, s));
     }
+
+    // 6. db에 존재하지 않는 새로운 맵 insert
+    const mapsToCreate = [...uniqueMaps]
+      .filter((name) => !existingMapCache.has(name))
+      .map((name) => ({ name }));
+
+    if (mapsToCreate.length > 0) {
+      const newMaps = await this.starCraftMapRepository.save(mapsToCreate);
+      newMaps.forEach((m) => existingMapCache.set(m.name, m));
+    }
+
+    // 7. 매치 해시 일괄 생성 및 중복 체크
+    const matchHashes = await Promise.all(
+      matchData.map(async (element) => {
+        const { date, winner, loser, map, elo, format, memo } = element;
+        const { name: winnerName } = this.parseStreamerNameAndRace(winner);
+        const { name: loserName } = this.parseStreamerNameAndRace(loser);
+
+        return {
+          hash: StarCraftGameMatch.generateHash({
+            date: new Date(date),
+            winner: winnerName,
+            loser: loserName,
+            map,
+            format,
+            memo,
+            eloPoint: elo,
+          }),
+          data: { date, winnerName, loserName, map, elo, format, memo },
+        };
+      }),
+    );
+
+    const existingHashes = await this.starCraftGameMatchRepository.find({
+      where: { uniqueHash: In(matchHashes.map((m) => m.hash)) },
+      select: ['uniqueHash'],
+    });
+
+    const existingHashSet = new Set(existingHashes.map((m) => m.uniqueHash));
+
+    // 8. 새로운 매치 생성 및 배치 저장
+    const newMatches = matchHashes
+      .filter(({ hash }) => !existingHashSet.has(hash))
+      .map(({ hash, data }) => {
+        const match = new StarCraftGameMatch();
+        match.date = new Date(data.date);
+        match.winner = existingStreamerMapCache.get(data.winnerName);
+        match.loser = existingStreamerMapCache.get(data.loserName);
+        match.map = existingMapCache.get(data.map);
+        match.eloPoint = data.elo;
+        match.format = data.format;
+        match.memo = data.memo;
+        match.uniqueHash = hash;
+        return match;
+      });
+
+    // 9. 배치 단위로 저장
+    for (let i = 0; i < newMatches.length; i += batchSize) {
+      const batch = newMatches.slice(i, i + batchSize);
+      await this.starCraftGameMatchRepository.save(batch);
+    }
+
+    return true;
   }
   private parseMatchData(html: string) {
     const $ = cheerio.load(html);
@@ -370,5 +431,30 @@ export class CrawlerService {
     return streams.filter((stream) =>
       TARGET_STREAMERS.includes(stream.profileUrl.split('/').pop() || ''),
     );
+  }
+
+  private parseStreamerNameAndRace(fullName: string): {
+    name: string;
+    race: StarCraftRace;
+  } {
+    const raceMap = {
+      T: StarCraftRace.Terran,
+      P: StarCraftRace.Protoss,
+      Z: StarCraftRace.Zerg,
+    };
+
+    const match = fullName.match(/^(.+?)([TPZ])$/);
+
+    if (match) {
+      return {
+        name: match[1].trim(),
+        race: raceMap[match[2] as keyof typeof raceMap],
+      };
+    }
+
+    return {
+      name: fullName.trim(),
+      race: null,
+    };
   }
 }
