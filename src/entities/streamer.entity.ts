@@ -19,19 +19,16 @@ export class Streamer {
   name: string;
 
   @Column({ nullable: true })
+  nickname: string;
+
+  @Column({ nullable: true })
+  soopId: string;
+
+  @Column({ nullable: true })
   profileImageUrl: string;
 
   @Column({ nullable: true })
   broadcastUrl: string;
-
-  @ManyToOne(() => Crew, (crew) => crew.members)
-  crew: Crew;
-
-  @ManyToOne(() => CrewRank, (rank) => rank.members, { eager: true })
-  rank: CrewRank;
-
-  @OneToMany(() => CrewEarning, (earning) => earning.member)
-  earnings: CrewEarning[];
 
   @Column({
     type: 'enum',
@@ -42,4 +39,13 @@ export class Streamer {
 
   @Column({ nullable: true })
   tier: string;
+
+  @ManyToOne(() => Crew, (crew) => crew.members)
+  crew: Crew;
+
+  @ManyToOne(() => CrewRank, (rank) => rank.members, { eager: true })
+  rank: CrewRank;
+
+  @OneToMany(() => CrewEarning, (earning) => earning.member)
+  earnings: CrewEarning[];
 }
