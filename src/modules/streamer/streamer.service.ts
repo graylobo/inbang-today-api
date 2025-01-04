@@ -8,14 +8,14 @@ import { Repository } from 'typeorm';
 import { Streamer } from '../../entities/streamer.entity';
 
 @Injectable()
-export class CrewMemberService {
+export class StreamerService {
   constructor(
     @InjectRepository(Streamer)
-    private crewMemberRepository: Repository<Streamer>,
+    private streamerRepository: Repository<Streamer>,
   ) {}
 
   async findAll(): Promise<Streamer[]> {
-    return this.crewMemberRepository.find({
+    return this.streamerRepository.find({
       relations: ['crew', 'rank'],
       order: {
         crew: { name: 'ASC' },
@@ -25,7 +25,7 @@ export class CrewMemberService {
   }
 
   async findAllByCrewId(crewId: number): Promise<Streamer[]> {
-    return this.crewMemberRepository.find({
+    return this.streamerRepository.find({
       where: { crew: { id: crewId } },
       relations: ['rank', 'crew'],
       order: { rank: { level: 'ASC' } },
@@ -33,21 +33,21 @@ export class CrewMemberService {
   }
 
   async findOne(id: number): Promise<Streamer> {
-    return this.crewMemberRepository.findOne({
+    return this.streamerRepository.findOne({
       where: { id },
       relations: ['rank', 'crew'],
     });
   }
 
   async create(memberData: any): Promise<Streamer> {
-    const member = this.crewMemberRepository.create({
+    const member = this.streamerRepository.create({
       name: memberData.name,
       profileImageUrl: memberData.profileImageUrl,
       broadcastUrl: memberData.broadcastUrl,
       crew: { id: memberData.crewId },
       rank: { id: memberData.rankId },
     });
-    return this.crewMemberRepository.save(member);
+    return this.streamerRepository.save(member);
   }
 
   async update(id: number, memberData: any): Promise<Streamer> {
@@ -65,13 +65,13 @@ export class CrewMemberService {
       updateData.rank = { id: memberData.rankId };
     }
 
-    await this.crewMemberRepository.update(id, updateData);
+    await this.streamerRepository.update(id, updateData);
     return this.findOne(id);
   }
 
   async delete(id: number): Promise<void> {
     try {
-      const member = await this.crewMemberRepository.findOne({
+      const member = await this.streamerRepository.findOne({
         where: { id },
         relations: ['earnings'],
       });
@@ -80,7 +80,7 @@ export class CrewMemberService {
         throw new NotFoundException('Member not found');
       }
 
-      await this.crewMemberRepository.remove(member);
+      await this.streamerRepository.remove(member);
     } catch (error) {
       if (error instanceof NotFoundException) {
         throw error;

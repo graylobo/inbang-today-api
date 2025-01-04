@@ -12,25 +12,25 @@ import {
 } from '@nestjs/common';
 import { Streamer } from '../../entities/streamer.entity';
 import { AdminGuard } from '../../guards/admin.guard';
-import { CrewMemberService } from './streamer.service';
+import { StreamerService } from 'src/modules/streamer/streamer.service';
 
-@Controller('crew-members')
-export class CrewMemberController {
-  constructor(private readonly crewMemberService: CrewMemberService) {}
+@Controller('streamers')
+export class StreamerController {
+  constructor(private readonly streamerService: StreamerService) {}
 
   @Get()
   async findAll(): Promise<Streamer[]> {
-    return this.crewMemberService.findAll();
+    return this.streamerService.findAll();
   }
 
   @Get('crew/:crewId')
   async findAllByCrewId(@Param('crewId') crewId: string): Promise<Streamer[]> {
-    return this.crewMemberService.findAllByCrewId(+crewId);
+    return this.streamerService.findAllByCrewId(+crewId);
   }
 
   @Get(':id')
   async findOne(@Param('id') id: string): Promise<Streamer> {
-    const member = await this.crewMemberService.findOne(+id);
+    const member = await this.streamerService.findOne(+id);
     if (!member) {
       throw new HttpException('Member not found', HttpStatus.NOT_FOUND);
     }
@@ -41,7 +41,7 @@ export class CrewMemberController {
   @Post()
   async create(@Body() memberData: Partial<Streamer>): Promise<Streamer> {
     try {
-      return await this.crewMemberService.create(memberData);
+      return await this.streamerService.create(memberData);
     } catch (error) {
       throw new HttpException(
         'Failed to create member',
@@ -57,11 +57,11 @@ export class CrewMemberController {
     @Body() memberData: Partial<Streamer>,
   ): Promise<Streamer> {
     try {
-      const member = await this.crewMemberService.findOne(+id);
+      const member = await this.streamerService.findOne(+id);
       if (!member) {
         throw new HttpException('Member not found', HttpStatus.NOT_FOUND);
       }
-      return await this.crewMemberService.update(+id, memberData);
+      return await this.streamerService.update(+id, memberData);
     } catch (error) {
       if (error instanceof HttpException) throw error;
       throw new HttpException(
@@ -74,6 +74,6 @@ export class CrewMemberController {
   @UseGuards(AdminGuard)
   @Delete(':id')
   async delete(@Param('id') id: string): Promise<void> {
-    await this.crewMemberService.delete(+id);
+    await this.streamerService.delete(+id);
   }
 }
