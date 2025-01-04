@@ -19,7 +19,7 @@ import { AuthModule } from './modules/auth/auth.module';
 import { BoardModule } from './modules/board/board.module';
 import { CrewBroadcastModule } from './modules/crew-broadcast/crew-broadcast.module';
 import { CrewEarningModule } from './modules/crew-earning/crew-earning.module';
-import { CrewMemberModule } from './modules/crew-member/crew-member.module';
+import { CrewMemberModule } from './modules/streamer/streamer.module';
 import { CrewRankModule } from './modules/crew-rank/crew-rank.module';
 import { CrewSignatureModule } from './modules/crew-signature/crew-signature.module';
 import { CrewModule } from './modules/crew/crew.module';

@@ -1,19 +1,18 @@
 import {
-  Controller,
-  Get,
-  Post,
-  Put,
-  Delete,
   Body,
-  Param,
+  Controller,
+  Delete,
+  Get,
   HttpException,
   HttpStatus,
+  Param,
+  Post,
+  Put,
   UseGuards,
-  NotFoundException,
 } from '@nestjs/common';
-import { CrewMemberService } from './crew-member.service';
 import { Streamer } from '../../entities/streamer.entity';
 import { AdminGuard } from '../../guards/admin.guard';
+import { CrewMemberService } from './streamer.service';
 
 @Controller('crew-members')
 export class CrewMemberController {
