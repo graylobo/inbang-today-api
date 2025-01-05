@@ -362,7 +362,7 @@ export class CrawlerService {
 
     return matches;
   }
-  // @Cron(CronExpression.EVERY_MINUTE)
+  @Cron(CronExpression.EVERY_MINUTE)
   async handleCron() {
     console.log('크롤링 시작:', new Date().toISOString());
     try {

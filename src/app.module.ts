@@ -28,6 +28,7 @@ import { LiveStreamModule } from 'src/modules/live-stream/live-stream.module';
 import { EventEmitterModule } from '@nestjs/event-emitter';
 import { StarCraftGameMatch } from 'src/entities/starcraft-game-match.entity';
 import { StarCraftMap } from 'src/entities/starcraft-map.entity';
+import { StarCraftGameMatchModule } from 'src/modules/starcraft-game-match/starcraft-game-match.module';
 
 console.log('process.env.DB_HOST', process.env.NODE_ENV);
 @Module({
@@ -89,6 +90,7 @@ console.log('process.env.DB_HOST', process.env.NODE_ENV);
     CrewSignatureModule,
     BoardModule,
     LiveStreamModule,
+    StarCraftGameMatchModule,
   ],
   controllers: [AppController],
   providers: [AppService],
