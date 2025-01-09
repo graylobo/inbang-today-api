@@ -1,0 +1,2 @@
+export const S3_CLIENT = 'S3_CLIENT';
+export const CLOUDFRONT_CLIENT = 'CLOUDFRONT_CLIENT';
