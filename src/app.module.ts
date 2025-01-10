@@ -29,11 +29,14 @@ import { EventEmitterModule } from '@nestjs/event-emitter';
 import { StarCraftGameMatch } from 'src/entities/starcraft-game-match.entity';
 import { StarCraftMap } from 'src/entities/starcraft-map.entity';
 import { StarCraftGameMatchModule } from 'src/modules/starcraft-game-match/starcraft-game-match.module';
+import { EditorModule } from 'src/modules/editor/editor.module';
+import { AwsModule } from 'src/modules/aws/aws.module';
 
 console.log('process.env.DB_HOST', process.env.NODE_ENV);
 @Module({
   imports: [
     ConfigModule.forRoot({
+      isGlobal: true,
       envFilePath: (() => {
         switch (process.env.NODE_ENV) {
           case 'development':
@@ -91,6 +94,8 @@ console.log('process.env.DB_HOST', process.env.NODE_ENV);
     BoardModule,
     LiveStreamModule,
     StarCraftGameMatchModule,
+    EditorModule,
+    AwsModule,
   ],
   controllers: [AppController],
   providers: [AppService],

@@ -5,6 +5,7 @@ import {
   DeleteObjectCommand,
   GetObjectCommand,
   HeadObjectCommand,
+  ListObjectsV2Command,
   PutObjectCommand,
   S3Client,
 } from '@aws-sdk/client-s3';
@@ -95,6 +96,41 @@ export class S3Service {
       );
     } catch (error) {
       console.error('Error deleting file from S3:', error);
+    }
+  }
+
+  async deleteOldObjects({
+    bucketName,
+    prefix,
+    olderThan,
+  }: {
+    bucketName: string;
+    prefix: string;
+    olderThan: number;
+  }): Promise<void> {
+    const command = new ListObjectsV2Command({
+      Bucket: bucketName,
+      Prefix: prefix,
+    });
+
+    try {
+      const response = await this.s3Client.send(command);
+      const now = new Date();
+      const deletePromises =
+        response.Contents?.filter((obj) => {
+          const age = now.getTime() - obj.LastModified.getTime();
+          return age > olderThan;
+        }).map((obj) => {
+          return this.deleteS3Object({
+            bucketName,
+            key: obj.Key,
+          });
+        }) || [];
+
+      await Promise.all(deletePromises);
+    } catch (error) {
+      console.error('Error listing/deleting old files:', error);
+      throw error;
     }
   }
 }
