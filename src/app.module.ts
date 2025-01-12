@@ -31,12 +31,17 @@ import { StarCraftMap } from 'src/entities/starcraft-map.entity';
 import { StarCraftGameMatchModule } from 'src/modules/starcraft-game-match/starcraft-game-match.module';
 import { EditorModule } from 'src/modules/editor/editor.module';
 import { AwsModule } from 'src/modules/aws/aws.module';
+import { validate } from 'src/config/env.validation';
+import configuration from 'src/config/configuration';
 
 console.log('process.env.DB_HOST', process.env.NODE_ENV);
 @Module({
   imports: [
     ConfigModule.forRoot({
       isGlobal: true,
+      load: [configuration],
+      cache: true,
+      validate,
       envFilePath: (() => {
         switch (process.env.NODE_ENV) {
           case 'development':

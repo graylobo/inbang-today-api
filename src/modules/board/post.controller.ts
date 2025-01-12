@@ -1,19 +1,17 @@
 import {
+  Body,
   Controller,
+  Delete,
   Get,
+  Param,
   Post,
   Put,
-  Delete,
-  Body,
-  Param,
-  UseGuards,
   Query,
   Request,
-  UnauthorizedException,
+  UnauthorizedException
 } from '@nestjs/common';
-import { PostService } from './post.service';
 import { BoardService } from './board.service';
-import { JwtAuthGuard } from '../../guards/jwt-auth.guard';
+import { PostService } from './post.service';
 
 @Controller('posts')
 export class PostController {
@@ -35,7 +33,7 @@ export class PostController {
   @Post()
   async create(@Body() postData: any, @Request() req: any) {
     const board = await this.boardService.findById(postData.boardId);
-    
+
     // 익명 게시판이 아닌 경우 로그인 필요
     if (!board.isAnonymous) {
       if (!req.user) {
@@ -54,7 +52,7 @@ export class PostController {
     @Request() req: any,
   ) {
     const post = await this.postService.findById(+id);
-    
+
     // 익명 게시글이 아닌 경우 작성자 확인
     if (post.author && (!req.user || post.author.id !== req.user.id)) {
       throw new UnauthorizedException('수정 권한이 없습니다.');
@@ -70,7 +68,7 @@ export class PostController {
     @Request() req: any,
   ) {
     const post = await this.postService.findById(+id);
-    
+
     // 익명 게시글이 아닌 경우 작성자 확인
     if (post.author && (!req.user || post.author.id !== req.user.id)) {
       throw new UnauthorizedException('삭제 권한이 없습니다.');
@@ -78,4 +76,4 @@ export class PostController {
 
     return this.postService.delete(+id, password);
   }
-} 
+}
