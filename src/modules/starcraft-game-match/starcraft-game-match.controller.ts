@@ -1,7 +1,7 @@
 import { Controller, Get, Query } from '@nestjs/common';
 import { GetMatchHistoryDto } from './dto/get-match-history.dto';
 import { GetStreamerStatsDto } from './dto/get-streamer-stats.dto';
-import { StarCraftGameMatchService } from './starcraft-game-match.service';
+import { StarCraftGameMatchService } from './services/starcraft-game-match.service';
 
 @Controller('starcraft')
 export class StarCraftGameMatchController {

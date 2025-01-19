@@ -33,6 +33,7 @@ import { EditorModule } from 'src/modules/editor/editor.module';
 import { AwsModule } from 'src/modules/aws/aws.module';
 import { validate } from 'src/config/env.validation';
 import configuration from 'src/config/configuration';
+import { StarCraftGameMatchHistory } from 'src/entities/starcraft-game-match-history.entity';
 
 console.log('process.env.DB_HOST', process.env.NODE_ENV);
 @Module({
@@ -83,6 +84,7 @@ console.log('process.env.DB_HOST', process.env.NODE_ENV);
         Comment,
         CrewSignatureDance,
         StarCraftGameMatch,
+        StarCraftGameMatchHistory,
         StarCraftMap,
       ],
       synchronize: true,

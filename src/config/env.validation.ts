@@ -25,9 +25,6 @@ export class EnvironmentVariables {
 
   @IsString()
   JWT_SECRET: string;
-
-  @IsString()
-  GRAY_LOBO: string;
 }
 
 export function validate(config: Record<string, unknown>) {

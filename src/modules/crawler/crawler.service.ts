@@ -162,9 +162,9 @@ export class CrawlerService {
       }
 
       // 2. 여자부 데이터 수집 및 처리 (페이지 순회)
-      console.log("Processing women's matches...");
-      const processedWomen = await this.processWomenMatchHistory(10);
-      totalProcessed += processedWomen;
+      // console.log("Processing women's matches...");
+      // const processedWomen = await this.processWomenMatchHistory(10);
+      // totalProcessed += processedWomen;
 
       console.log(`Total matches processed: ${totalProcessed}`);
       return true;

@@ -2,8 +2,8 @@ import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { StarCraftGameMatch } from 'src/entities/starcraft-game-match.entity';
 import { Repository } from 'typeorm';
-import { GetMatchHistoryDto } from './dto/get-match-history.dto';
-import { GetStreamerStatsDto } from './dto/get-streamer-stats.dto';
+import { GetMatchHistoryDto } from '../dto/get-match-history.dto';
+import { GetStreamerStatsDto } from '../dto/get-streamer-stats.dto';
 
 export interface OpponentStats {
   opponent: {
