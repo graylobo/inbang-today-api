@@ -1,4 +1,4 @@
-import { Column, Entity, PrimaryGeneratedColumn } from 'typeorm';
+import { Entity, PrimaryGeneratedColumn, Column } from 'typeorm';
 
 @Entity()
 export class StarCraftGameMatchHistory {
@@ -17,7 +17,7 @@ export class StarCraftGameMatchHistory {
   @Column()
   newHash: string;
 
-  @Column({ type: 'jsonb' })
+  @Column({ type: 'jsonb', nullable: true }) // nullable: true 추가
   previousData: {
     date: Date;
     winner: string;
@@ -28,7 +28,7 @@ export class StarCraftGameMatchHistory {
     eloPoint?: number;
   };
 
-  @Column({ type: 'jsonb' })
+  @Column({ type: 'jsonb', nullable: true }) // nullable: true 추가
   newData: {
     date: Date;
     winner: string;

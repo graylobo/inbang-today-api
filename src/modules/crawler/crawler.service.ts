@@ -9,14 +9,18 @@ import { TARGET_STREAMERS } from 'src/modules/crawler/metadata';
 import { StreamInfo } from 'src/modules/crawler/type';
 import { RedisService } from 'src/modules/redis/redis.service';
 import * as cheerio from 'cheerio';
-import { In, Repository } from 'typeorm';
+import { Between, In, Repository } from 'typeorm';
 import { Streamer } from 'src/entities/streamer.entity';
 import { InjectRepository } from '@nestjs/typeorm';
-import { StarCraftGameMatch } from 'src/entities/starcraft-game-match.entity';
+import {
+  MatchOrigin,
+  StarCraftGameMatch,
+} from 'src/entities/starcraft-game-match.entity';
 import { StarCraftMap } from 'src/entities/starcraft-map.entity';
 import { findOrCreate } from 'src/utils';
 import { GetSaveMatchDataDto } from 'src/modules/crawler/dto/request/get-save-match-data.dto';
 import { StarCraftRace } from 'src/entities/types/streamer.type';
+import { StarCraftGameMatchHistory } from 'src/entities/starcraft-game-match-history.entity';
 
 export interface MatchData {
   date: string;
@@ -147,24 +151,26 @@ export class CrawlerService {
       let totalProcessed = 0;
 
       // 1. 남자부 데이터 수집 및 처리 (POST 요청)
-      console.log("Processing men's matches...");
-      const menMatches = await this.getMenMatchHistory(
-        query.startDate,
-        query.endDate,
-      );
-      if (menMatches.length > 0) {
-        const processed = await this.processAndSaveMatches(
-          menMatches,
-          batchSize,
-        );
-        totalProcessed += processed;
-        console.log(`Processed ${processed} men's matches`);
-      }
+      // console.log("Processing men's matches...");
+      // const menMatches = await this.getMenMatchHistory(
+      //   query.startDate,
+      //   query.endDate,
+      // );
+
+      // if (menMatches.length > 0) {
+      //   const processed = await this.processAndSaveMatches(
+      //     menMatches,
+      //     batchSize,
+      //     MatchOrigin.MEN,
+      //   );
+      //   totalProcessed += processed;
+      //   console.log(`Processed ${processed} men's matches`);
+      // }
 
       // 2. 여자부 데이터 수집 및 처리 (페이지 순회)
-      // console.log("Processing women's matches...");
-      // const processedWomen = await this.processWomenMatchHistory(10);
-      // totalProcessed += processedWomen;
+      console.log("Processing women's matches...");
+      const processedWomen = await this.processWomenMatchHistory(10);
+      totalProcessed += processedWomen;
 
       console.log(`Total matches processed: ${totalProcessed}`);
       return true;
@@ -200,7 +206,8 @@ export class CrawlerService {
   private async processWomenMatchHistory(batchSize: number): Promise<number> {
     const MAX_PAGE = 2000;
     let totalProcessed = 0;
-    let pageMatches: MatchData[] = [];
+    const currentDateMatches = new Map<string, MatchData[]>();
+    let currentDate: string | null = null;
 
     for (let page = 1; page <= MAX_PAGE; page++) {
       try {
@@ -219,38 +226,54 @@ export class CrawlerService {
 
         const currentPageMatches = this.parseMatchDataFromTable(response.data);
         if (currentPageMatches.length === 0) {
-          console.log('No more matches found, stopping pagination');
+          // 마지막으로 남은 날짜 데이터 처리
+          if (currentDate && currentDateMatches.size > 0) {
+            const matches = currentDateMatches.get(currentDate);
+            await this.processDateMatches(matches, batchSize);
+          }
           break;
         }
 
-        // 현재 페이지의 매치를 배열에 추가
-        pageMatches.push(...currentPageMatches);
+        for (const match of currentPageMatches) {
+          const matchDate = new Date(match.date).toISOString().split('T')[0];
 
-        // batchSize에 도달하거나 마지막 페이지인 경우 처리
-        if (pageMatches.length >= batchSize || page === MAX_PAGE) {
-          const processed = await this.processAndSaveMatches(
-            pageMatches,
-            batchSize,
-          );
-          totalProcessed += processed;
-          console.log(
-            `Processed ${processed} matches from pages ${page - Math.ceil(pageMatches.length / 25) + 1} to ${page}`,
-          );
+          // 새로운 날짜 시작
+          if (currentDate === null) {
+            currentDate = matchDate;
+          }
 
-          // 처리 완료된 매치 배열 초기화
-          pageMatches = [];
+          // 날짜가 변경된 경우
+          if (matchDate !== currentDate) {
+            // 이전 날짜의 데이터 처리
+            const matches = currentDateMatches.get(currentDate);
+            if (matches) {
+              const processed = await this.processDateMatches(
+                matches,
+                batchSize,
+              );
+              totalProcessed += processed;
+              console.log(
+                `Processed ${processed} matches for date ${currentDate}`,
+              );
+            }
+
+            // 새로운 날짜 시작
+            currentDate = matchDate;
+            currentDateMatches.clear();
+          }
+
+          // 현재 날짜의 매치 추가
+          if (!currentDateMatches.has(matchDate)) {
+            currentDateMatches.set(matchDate, []);
+          }
+          currentDateMatches.get(matchDate).push(match);
         }
-
-        // 서버 부하 방지를 위한 지연
-        // await new Promise((resolve) => setTimeout(resolve, 1000));
       } catch (error) {
         console.error(`Error fetching page ${page}:`, error);
-        // 현재 배치 처리
-        if (pageMatches.length > 0) {
-          const processed = await this.processAndSaveMatches(
-            pageMatches,
-            batchSize,
-          );
+        // 페이지 순회 중 에러가 발생해도 수집된 데이터는 처리
+        if (currentDate && currentDateMatches.size > 0) {
+          const matches = currentDateMatches.get(currentDate);
+          const processed = await this.processDateMatches(matches, batchSize);
           totalProcessed += processed;
         }
         break;
@@ -259,10 +282,27 @@ export class CrawlerService {
 
     return totalProcessed;
   }
+  private async processDateMatches(
+    matches: MatchData[],
+    batchSize: number,
+  ): Promise<number> {
+    try {
+      const processed = await this.processAndSaveMatches(
+        matches,
+        batchSize,
+        MatchOrigin.WOMEN,
+      );
+      return processed;
+    } catch (error) {
+      console.error('Error processing matches:', error);
+      return 0;
+    }
+  }
 
   private async processAndSaveMatches(
     matches: MatchData[],
     batchSize: number,
+    origin: MatchOrigin,
   ): Promise<number> {
     // 1. 스트리머 정보 파싱 및 중복 제거
     const parsedStreamers = new Map();
@@ -307,6 +347,7 @@ export class CrawlerService {
       existingStreamerMapCache,
       existingMapCache,
       batchSize,
+      origin,
     );
   }
 
@@ -592,72 +633,152 @@ export class CrawlerService {
     existingStreamerMapCache: Map<string, Streamer>,
     existingMapCache: Map<string, StarCraftMap>,
     batchSize: number,
+    origin: MatchOrigin,
   ): Promise<number> {
     let totalSaved = 0;
 
-    // 매치 해시 생성
-    const matchHashes = matches.map((element) => {
-      const { date, winner, loser, map, elo, format, memo } = element;
-      const { name: winnerName } = this.parseStreamerNameAndRace(winner);
-      const { name: loserName } = this.parseStreamerNameAndRace(loser);
+    // 1. 날짜별로 매치 그룹화
+    const matchesByDate = matches.reduce(
+      (acc, match) => {
+        const date = new Date(match.date).toISOString().split('T')[0];
+        if (!acc[date]) acc[date] = [];
+        acc[date].push(match);
+        return acc;
+      },
+      {} as Record<string, MatchData[]>,
+    );
 
-      return {
-        hash: StarCraftGameMatch.generateHash({
-          date: new Date(date),
-          winner: winnerName,
-          loser: loserName,
-          map,
-          format,
-          memo,
-          eloPoint: elo,
-        }),
-        data: { date, winnerName, loserName, map, elo, format, memo },
-      };
-    });
-
-    // 중복 제거를 위한 Set 생성
-    const uniqueHashes = new Set();
-    const uniqueMatches = [];
-
-    // 중복 없는 매치 데이터만 생성
-    for (const { hash, data } of matchHashes) {
-      if (!uniqueHashes.has(hash)) {
-        uniqueHashes.add(hash);
-        const match = new StarCraftGameMatch();
-        match.date = new Date(data.date);
-        match.winner = existingStreamerMapCache.get(data.winnerName);
-        match.loser = existingStreamerMapCache.get(data.loserName);
-        match.map = existingMapCache.get(data.map);
-        match.eloPoint = data.elo;
-        match.format = data.format;
-        match.memo = data.memo;
-        match.uniqueHash = hash;
-        uniqueMatches.push(match);
-      }
-    }
-
-    // 배치 단위로 저장 (트랜잭션 사용)
-    for (let i = 0; i < uniqueMatches.length; i += batchSize) {
-      const batch = uniqueMatches.slice(i, i + batchSize);
+    // 2. 각 날짜별로 처리
+    for (const [date, dateMatches] of Object.entries(matchesByDate)) {
       await this.starCraftGameMatchRepository.manager.transaction(
         async (manager) => {
-          // 이미 존재하는 해시 확인
-          const existingHashes = await manager.find(StarCraftGameMatch, {
-            where: { uniqueHash: In(batch.map((m) => m.uniqueHash)) },
-            select: ['uniqueHash'],
+          // 3. 해당 날짜의 모든 기존 매치 조회
+          const existingMatches = await manager.find(StarCraftGameMatch, {
+            where: {
+              date: Between(
+                new Date(`${date}T00:00:00Z`),
+                new Date(`${date}T23:59:59Z`),
+              ),
+              origin,
+            },
+            relations: ['winner', 'loser', 'map'],
           });
 
-          // 중복되지 않은 매치만 저장
-          const hashSet = new Set(existingHashes.map((m) => m.uniqueHash));
-          const newBatch = batch.filter(
-            (match) => !hashSet.has(match.uniqueHash),
+          const historyRepository = manager.getRepository(
+            StarCraftGameMatchHistory,
+          );
+          const newMatchesSet = new Set<string>();
+          const newMatchesByHash = new Map<string, StarCraftGameMatch>();
+
+          // 4. 새 매치 데이터 준비 (메모리 관리를 위해 배치 처리)
+          for (let i = 0; i < dateMatches.length; i += batchSize) {
+            const batchMatches = dateMatches.slice(i, i + batchSize);
+
+            for (const match of batchMatches) {
+              const { name: winnerName } = this.parseStreamerNameAndRace(
+                match.winner,
+              );
+              const { name: loserName } = this.parseStreamerNameAndRace(
+                match.loser,
+              );
+
+              const matchHash = StarCraftGameMatch.generateHash({
+                date: new Date(match.date),
+                winner: winnerName,
+                loser: loserName,
+                map: match.map,
+                format: match.format,
+                memo: match.memo,
+                eloPoint: match.elo,
+                origin,
+              });
+
+              if (!newMatchesSet.has(matchHash)) {
+                newMatchesSet.add(matchHash);
+
+                const newMatch = new StarCraftGameMatch();
+                newMatch.date = new Date(match.date);
+                newMatch.winner = existingStreamerMapCache.get(winnerName);
+                newMatch.loser = existingStreamerMapCache.get(loserName);
+                newMatch.map = existingMapCache.get(match.map);
+                newMatch.eloPoint = match.elo;
+                newMatch.format = match.format;
+                newMatch.memo = match.memo;
+                newMatch.uniqueHash = matchHash;
+                newMatch.origin = origin;
+
+                newMatchesByHash.set(matchHash, newMatch);
+              }
+            }
+          }
+
+          // 5. 삭제된 매치 처리
+          for (const existingMatch of existingMatches) {
+            if (
+              existingMatch.origin === origin &&
+              !newMatchesSet.has(existingMatch.uniqueHash)
+            ) {
+              // 이력 기록
+              const history = new StarCraftGameMatchHistory();
+              history.matchId = existingMatch.id;
+              history.changeTimestamp = new Date();
+              history.previousHash = existingMatch.uniqueHash;
+              history.newHash = '';
+              history.previousData = {
+                date: existingMatch.date,
+                winner: existingMatch.winner.name,
+                loser: existingMatch.loser.name,
+                map: existingMatch.map.name,
+                format: existingMatch.format,
+                memo: existingMatch.memo,
+                eloPoint: existingMatch.eloPoint,
+              };
+              history.newData = null;
+              history.changeType = 'DELETE';
+
+              await historyRepository.save(history);
+              await manager.remove(existingMatch);
+            }
+          }
+
+          // 6. 새로운 매치 처리
+          const existingMatchesByHash = new Map(
+            existingMatches.map((m) => [m.uniqueHash, m]),
           );
 
-          if (newBatch.length > 0) {
-            await manager.save(StarCraftGameMatch, newBatch);
-            totalSaved += newBatch.length;
-            console.log(`Saved ${newBatch.length} new matches in batch`);
+          for (const [hash, newMatch] of newMatchesByHash.entries()) {
+            const existingMatch = existingMatchesByHash.get(hash);
+
+            if (!existingMatch) {
+              // 새로운 매치 추가
+              const savedMatch = await manager.save(newMatch);
+              totalSaved++;
+
+              // 이력 기록
+              const history = new StarCraftGameMatchHistory();
+              history.matchId = savedMatch.id;
+              history.changeTimestamp = new Date();
+              history.previousHash = '';
+              history.newHash = hash;
+              history.previousData = null;
+              history.newData = {
+                date: savedMatch.date,
+                winner: savedMatch.winner.name,
+                loser: savedMatch.loser.name,
+                map: savedMatch.map.name,
+                format: savedMatch.format,
+                memo: savedMatch.memo,
+                eloPoint: savedMatch.eloPoint,
+              };
+              history.changeType = 'CREATE';
+
+              await historyRepository.save(history);
+            }
           }
+
+          console.log(
+            `Processed ${dateMatches.length} matches for date ${date}`,
+          );
         },
       );
     }

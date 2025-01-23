@@ -10,10 +10,18 @@ import {
   PrimaryGeneratedColumn,
 } from 'typeorm';
 
+export enum MatchOrigin {
+  MEN = 'men',
+  WOMEN = 'women',
+}
+
 @Entity()
 export class StarCraftGameMatch {
   @PrimaryGeneratedColumn()
   id: number;
+
+  @Column({ type: 'enum', enum: MatchOrigin })
+  origin: MatchOrigin;
 
   @Column()
   date: Date;
@@ -47,6 +55,7 @@ export class StarCraftGameMatch {
     format: string;
     memo?: string;
     eloPoint?: number;
+    origin: MatchOrigin;
   }): string {
     // 날짜를 일관된 형식으로 변환
     const formattedDate = data.date.toISOString().split('T')[0];
@@ -60,6 +69,7 @@ export class StarCraftGameMatch {
       data.format,
       data.memo || '',
       data.eloPoint || '',
+      data.origin,
     ].join('_');
 
     return createHash('md5').update(uniqueString).digest('hex');
@@ -76,6 +86,7 @@ export class StarCraftGameMatch {
       format: this.format,
       memo: this.memo,
       eloPoint: this.eloPoint,
+      origin: this.origin,
     });
   }
 }
