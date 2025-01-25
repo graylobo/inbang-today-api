@@ -2,25 +2,25 @@ import { HttpService } from '@nestjs/axios';
 import { Injectable } from '@nestjs/common';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { Cron, CronExpression } from '@nestjs/schedule';
+import { InjectRepository } from '@nestjs/typeorm';
+import * as cheerio from 'cheerio';
 import { Browser, chromium } from 'playwright';
 import { firstValueFrom } from 'rxjs';
-import { STREAM_EVENTS } from 'src/events/stream.events';
-import { TARGET_STREAMERS } from 'src/modules/crawler/metadata';
-import { StreamInfo } from 'src/modules/crawler/type';
-import { RedisService } from 'src/modules/redis/redis.service';
-import * as cheerio from 'cheerio';
-import { Between, In, Repository } from 'typeorm';
-import { Streamer } from 'src/entities/streamer.entity';
-import { InjectRepository } from '@nestjs/typeorm';
+import { StarCraftGameMatchHistory } from 'src/entities/starcraft-game-match-history.entity';
 import {
   MatchOrigin,
   StarCraftGameMatch,
 } from 'src/entities/starcraft-game-match.entity';
 import { StarCraftMap } from 'src/entities/starcraft-map.entity';
-import { findOrCreate } from 'src/utils';
-import { GetSaveMatchDataDto } from 'src/modules/crawler/dto/request/get-save-match-data.dto';
+import { Streamer } from 'src/entities/streamer.entity';
 import { StarCraftRace } from 'src/entities/types/streamer.type';
-import { StarCraftGameMatchHistory } from 'src/entities/starcraft-game-match-history.entity';
+import { STREAM_EVENTS } from 'src/events/stream.events';
+import { GetSaveMatchDataDto } from 'src/modules/crawler/dto/request/get-save-match-data.dto';
+import { TARGET_STREAMERS } from 'src/modules/crawler/metadata';
+import { StreamInfo } from 'src/modules/crawler/type';
+import { RedisService } from 'src/modules/redis/redis.service';
+import { formatDateString } from 'src/utils/format-date-string.utils';
+import { Between, In, Repository } from 'typeorm';
 
 export interface MatchData {
   date: string;
@@ -30,6 +30,11 @@ export interface MatchData {
   elo: number;
   format: string;
   memo: string;
+}
+
+interface DateRange {
+  startDate: string;
+  endDate: string;
 }
 
 @Injectable()
@@ -149,13 +154,11 @@ export class CrawlerService {
   async saveMatchData(query: GetSaveMatchDataDto, batchSize: number = 1000) {
     try {
       let totalProcessed = 0;
+      const { startDate, endDate } = query;
 
       // 1. 남자부 데이터 수집 및 처리 (POST 요청)
-      // console.log("Processing men's matches...");
-      // const menMatches = await this.getMenMatchHistory(
-      //   query.startDate,
-      //   query.endDate,
-      // );
+      console.log("Processing men's matches...");
+      // const menMatches = await this.getMenMatchHistory(startDate, endDate);
 
       // if (menMatches.length > 0) {
       //   const processed = await this.processAndSaveMatches(
@@ -169,7 +172,10 @@ export class CrawlerService {
 
       // 2. 여자부 데이터 수집 및 처리 (페이지 순회)
       console.log("Processing women's matches...");
-      const processedWomen = await this.processWomenMatchHistory(10);
+      const processedWomen = await this.processWomenMatchHistory(
+        { startDate, endDate },
+        1000,
+      );
       totalProcessed += processedWomen;
 
       console.log(`Total matches processed: ${totalProcessed}`);
@@ -203,18 +209,34 @@ export class CrawlerService {
     return this.parseMatchData(response.data);
   }
 
-  private async processWomenMatchHistory(batchSize: number): Promise<number> {
-    const MAX_PAGE = 2000;
+  private async processWomenMatchHistory(
+    dateRange: DateRange,
+    batchSize: number,
+  ): Promise<number> {
+    const startDate = new Date(formatDateString(dateRange.startDate));
+    const endDate = new Date(formatDateString(dateRange.endDate));
+    // 날짜 유효성 검사
+    if (isNaN(startDate.getTime()) || isNaN(endDate.getTime())) {
+      throw new Error(
+        'Invalid date format. Please provide dates in YYYY-MM-DD format',
+      );
+    }
+
+    if (startDate > endDate) {
+      throw new Error('Start date must be before or equal to end date');
+    }
+
     let totalProcessed = 0;
     const currentDateMatches = new Map<string, MatchData[]>();
     let currentDate: string | null = null;
+    let isOutOfDateRange = false;
+    let page = 1;
 
-    for (let page = 1; page <= MAX_PAGE; page++) {
+    while (!isOutOfDateRange) {
       try {
-        console.log(`Fetching women's matches page ${page}/${MAX_PAGE}`);
+        console.log(`Fetching women's matches page ${page}`);
 
         const eloBoardUrl = `https://eloboard.com/women/bbs/board.php?bo_table=bj_board&page=${page}`;
-
         const response = await firstValueFrom(
           this.httpService.get(eloBoardUrl, {
             headers: {
@@ -234,16 +256,30 @@ export class CrawlerService {
           break;
         }
 
+        // 페이지의 매치들을 처리
         for (const match of currentPageMatches) {
-          const matchDate = new Date(match.date).toISOString().split('T')[0];
+          const matchDate = new Date(match.date);
+          const matchDateStr = matchDate.toISOString().split('T')[0];
+
+          // 날짜 범위 체크
+          if (matchDate < startDate) {
+            // 날짜 범위를 벗어난 경우 (너무 과거)
+            isOutOfDateRange = true;
+            break;
+          }
+
+          if (matchDate > endDate) {
+            // 범위를 벗어난 데이터는 스킵
+            continue;
+          }
 
           // 새로운 날짜 시작
           if (currentDate === null) {
-            currentDate = matchDate;
+            currentDate = matchDateStr;
           }
 
           // 날짜가 변경된 경우
-          if (matchDate !== currentDate) {
+          if (matchDateStr !== currentDate) {
             // 이전 날짜의 데이터 처리
             const matches = currentDateMatches.get(currentDate);
             if (matches) {
@@ -258,19 +294,21 @@ export class CrawlerService {
             }
 
             // 새로운 날짜 시작
-            currentDate = matchDate;
+            currentDate = matchDateStr;
             currentDateMatches.clear();
           }
 
           // 현재 날짜의 매치 추가
-          if (!currentDateMatches.has(matchDate)) {
-            currentDateMatches.set(matchDate, []);
+          if (!currentDateMatches.has(matchDateStr)) {
+            currentDateMatches.set(matchDateStr, []);
           }
-          currentDateMatches.get(matchDate).push(match);
+          currentDateMatches.get(matchDateStr).push(match);
         }
+
+        page++;
       } catch (error) {
         console.error(`Error fetching page ${page}:`, error);
-        // 페이지 순회 중 에러가 발생해도 수집된 데이터는 처리
+        // 에러 발생 시 현재까지 수집된 데이터 처리
         if (currentDate && currentDateMatches.size > 0) {
           const matches = currentDateMatches.get(currentDate);
           const processed = await this.processDateMatches(matches, batchSize);
@@ -280,6 +318,13 @@ export class CrawlerService {
       }
     }
 
+    // 마지막 날짜의 데이터 처리
+    if (currentDate && currentDateMatches.size > 0) {
+      const matches = currentDateMatches.get(currentDate);
+      const processed = await this.processDateMatches(matches, batchSize);
+      totalProcessed += processed;
+    }
+
     return totalProcessed;
   }
   private async processDateMatches(
@@ -287,6 +332,7 @@ export class CrawlerService {
     batchSize: number,
   ): Promise<number> {
     try {
+      console.log(`Processing batch of ${matches.length} matches`);
       const processed = await this.processAndSaveMatches(
         matches,
         batchSize,
@@ -403,7 +449,7 @@ export class CrawlerService {
 
     return matches;
   }
-  @Cron(CronExpression.EVERY_MINUTE)
+  // @Cron(CronExpression.EVERY_MINUTE)
   async handleCron() {
     console.log('크롤링 시작:', new Date().toISOString());
     try {
