@@ -8,10 +8,12 @@ import {
   Put,
   Query,
   Request,
-  UnauthorizedException
+  UnauthorizedException,
+  UseGuards,
 } from '@nestjs/common';
 import { BoardService } from './board.service';
 import { PostService } from './post.service';
+import { JwtAuthGuard } from 'src/guards/jwt-auth.guard';
 
 @Controller('posts')
 export class PostController {
@@ -31,6 +33,7 @@ export class PostController {
   }
 
   @Post()
+  @UseGuards(JwtAuthGuard)
   async create(@Body() postData: any, @Request() req: any) {
     const board = await this.boardService.findById(postData.boardId);
 

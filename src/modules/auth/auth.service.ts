@@ -27,12 +27,18 @@ export class AuthService {
       where: { id: user.id },
     });
 
+    console.log('Login User:', currentUser);
+
     const payload = { username: currentUser.username, sub: currentUser.id };
+    console.log('Token Payload:', payload);
+    console.log('JWT Secret:', process.env.JWT_SECRET);
+
+    const token = this.jwtService.sign(payload);
 
     const { password, ...userInfo } = currentUser;
 
     return {
-      access_token: this.jwtService.sign(payload),
+      access_token: token,
       user: userInfo,
     };
   }

@@ -19,16 +19,19 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
   }
 
   async validate(payload: any) {
-    // 데이터베이스에서 최신 사용자 정보를 조회
+    // 디버깅을 위한 로그 추가
+    console.log('JWT Payload:', payload);
+
     const user = await this.userRepository.findOne({
       where: { id: payload.sub },
     });
+
+    console.log('Found User:', user);
 
     if (!user) {
       throw new UnauthorizedException();
     }
 
-    // isAdmin 속성을 포함하여 반환
     return {
       userId: user.id,
       username: user.username,
