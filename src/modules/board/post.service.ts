@@ -85,6 +85,6 @@ export class PostService {
       }
     }
 
-    await this.postRepository.delete(id);
+    await this.postRepository.softDelete(id);
   }
 }

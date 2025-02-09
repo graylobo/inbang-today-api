@@ -42,7 +42,7 @@ export class PostController {
       if (!req.user) {
         throw new UnauthorizedException('로그인이 필요합니다.');
       }
-      postData.author = { id: req.user.id };
+      postData.author = { id: req.user.userId };
     }
 
     return this.postService.create(postData);
@@ -65,6 +65,7 @@ export class PostController {
   }
 
   @Delete(':id')
+  @UseGuards(JwtAuthGuard)
   async delete(
     @Param('id') id: string,
     @Query('password') password: string,
@@ -73,7 +74,7 @@ export class PostController {
     const post = await this.postService.findById(+id);
 
     // 익명 게시글이 아닌 경우 작성자 확인
-    if (post.author && (!req.user || post.author.id !== req.user.id)) {
+    if (post.author && (!req.user || post.author.id !== req.user.userId)) {
       throw new UnauthorizedException('삭제 권한이 없습니다.');
     }
 
