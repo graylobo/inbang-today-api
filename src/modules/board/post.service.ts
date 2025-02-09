@@ -71,7 +71,22 @@ export class PostService {
       }
     }
 
-    await this.postRepository.update(id, postData);
+    // 업데이트할 필드만 선택
+    const updateData: any = {
+      title: postData.title,
+      content: postData.content,
+    };
+
+    // boardId가 제공되었고 현재 게시판과 다른 경우에만 board 관계 업데이트
+    if (postData.boardId && post.board.id !== postData.boardId) {
+      updateData.board = { id: postData.boardId };
+    }
+
+    await this.postRepository.save({
+      id,
+      ...updateData,
+    });
+
     return this.findById(id);
   }
 

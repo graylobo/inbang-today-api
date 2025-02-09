@@ -49,6 +49,7 @@ export class PostController {
   }
 
   @Put(':id')
+  @UseGuards(JwtAuthGuard)
   async update(
     @Param('id') id: string,
     @Body() updateData: any,
@@ -57,7 +58,7 @@ export class PostController {
     const post = await this.postService.findById(+id);
 
     // 익명 게시글이 아닌 경우 작성자 확인
-    if (post.author && (!req.user || post.author.id !== req.user.id)) {
+    if (post.author && (!req.user || post.author.id !== req.user.userId)) {
       throw new UnauthorizedException('수정 권한이 없습니다.');
     }
 
