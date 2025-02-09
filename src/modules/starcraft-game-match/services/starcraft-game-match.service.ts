@@ -99,7 +99,7 @@ export class StarCraftGameMatchService {
     const opponentStats = new Map<number, OpponentStats>();
 
     matches.forEach((match) => {
-      const isWinner = match.winner.id === query.streamerId;
+      const isWinner = match.winner.id === Number(query.streamerId);
       const opponent = isWinner ? match.loser : match.winner;
 
       streamerStats.totalGames++;

@@ -5,7 +5,7 @@ import { Cron, CronExpression } from '@nestjs/schedule';
 import { InjectRepository } from '@nestjs/typeorm';
 import * as cheerio from 'cheerio';
 import { Browser, chromium } from 'playwright';
-import { firstValueFrom } from 'rxjs';
+import { firstValueFrom, timeout } from 'rxjs';
 import { StarCraftGameMatchHistory } from 'src/entities/starcraft-game-match-history.entity';
 import {
   MatchOrigin,
@@ -21,6 +21,7 @@ import { StreamInfo } from 'src/modules/crawler/type';
 import { RedisService } from 'src/modules/redis/redis.service';
 import { formatDateString } from 'src/utils/format-date-string.utils';
 import { Between, In, Repository } from 'typeorm';
+import { IsNull } from 'typeorm';
 
 export interface MatchData {
   date: string;
@@ -158,17 +159,17 @@ export class CrawlerService {
 
       // 1. 남자부 데이터 수집 및 처리 (POST 요청)
       console.log("Processing men's matches...");
-      // const menMatches = await this.getMenMatchHistory(startDate, endDate);
+      const menMatches = await this.getMenMatchHistory(startDate, endDate);
 
-      // if (menMatches.length > 0) {
-      //   const processed = await this.processAndSaveMatches(
-      //     menMatches,
-      //     batchSize,
-      //     MatchOrigin.MEN,
-      //   );
-      //   totalProcessed += processed;
-      //   console.log(`Processed ${processed} men's matches`);
-      // }
+      if (menMatches.length > 0) {
+        const processed = await this.processAndSaveMatches(
+          menMatches,
+          batchSize,
+          MatchOrigin.MEN,
+        );
+        totalProcessed += processed;
+        console.log(`Processed ${processed} men's matches`);
+      }
 
       // 2. 여자부 데이터 수집 및 처리 (페이지 순회)
       console.log("Processing women's matches...");
@@ -830,5 +831,156 @@ export class CrawlerService {
     }
 
     return totalSaved;
+  }
+
+  /** 씨나인 사이트에서 스트리머 이름을 통해 숲ID 찾기*/
+  private async getAllStreamersInfo(): Promise<Map<string, string | null>> {
+    let browser;
+    try {
+      browser = await chromium.launch({
+        headless: false,
+        devtools: true,
+        args: [
+          '--no-sandbox',
+          '--disable-setuid-sandbox',
+          // User-Agent 설정
+          '--user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36',
+        ],
+      });
+
+      const page = await browser.newPage();
+      page.on('console', (msg) => console.log('브라우저:', msg.text()));
+
+      console.log('페이지 로딩 시작...');
+      const response = await page.goto('https://www.cnine.kr/starcraft/tier', {
+        timeout: this.LOAD_TIMEOUT,
+        waitUntil: 'networkidle',
+      });
+
+      if (!response || !response.ok()) {
+        console.error(`페이지 로드 실패: ${response?.status()}`);
+        return new Map();
+      }
+
+      await page.click('#switch-13', { force: true });
+
+      console.log('스트리머 정보 수집 시작...');
+      const streamersInfo = await page.evaluate(() => {
+        const result: Record<string, string> = {};
+        // v-col v-col-12 mt-10 클래스를 가진 요소 내의 game-player-card 찾기
+        const cards = document
+          .querySelector('.v-col.v-col-12.mt-10')
+          ?.querySelectorAll('.game-player-card');
+
+        console.log('찾은 카드 수:', cards?.length || 0);
+
+        if (!cards) {
+          console.log('카드를 찾을 수 없습니다');
+          return result;
+        }
+
+        cards.forEach((card) => {
+          const nicknameElement = card.querySelector(
+            '.player-bottom .text-icon-75',
+          );
+          const imgElement = card.querySelector('.player-image-wrap img');
+
+          if (nicknameElement && imgElement) {
+            const nickname = nicknameElement.textContent.trim().split(' ')[0];
+            const imgSrc = imgElement.getAttribute('src');
+            if (nickname && imgSrc) {
+              console.log(`스트리머 발견: ${nickname}`);
+              result[nickname] = imgSrc;
+            }
+          }
+        });
+
+        return result;
+      });
+
+      console.log(
+        `총 ${Object.keys(streamersInfo).length}명의 스트리머 정보 수집 완료`,
+      );
+
+      // 타입을 명시적으로 지정하여 Map 생성
+      const streamersMap = new Map<string, string | null>();
+
+      // 각 엔트리를 순회하면서 Map에 추가
+      Object.entries(streamersInfo).forEach(([name, imgUrl]) => {
+        const soopId = this.extractChannelIdFromProfileImage(imgUrl as string);
+        if (soopId) {
+          streamersMap.set(name, soopId);
+        }
+      });
+
+      return streamersMap;
+    } catch (error) {
+      console.error('스트리머 정보 수집 중 에러 발생:', error);
+      return new Map();
+    } finally {
+      if (browser) {
+        await browser.close();
+      }
+    }
+  }
+
+  private extractChannelIdFromProfileImage(
+    profileImageUrl: string,
+  ): string | null {
+    try {
+      // URL 패턴: //profile.img.sooplive.co.kr/LOGO/yo/yoo376/yoo376.jpg
+      const matches = profileImageUrl.match(/\/LOGO\/\w+\/(\w+)\/\1\.jpg$/);
+      if (matches && matches[1]) {
+        return matches[1];
+      }
+      return null;
+    } catch (error) {
+      console.error('채널 ID 추출 실패:', error);
+      return null;
+    }
+  }
+
+  async updateAllStreamersSoopId(): Promise<void> {
+    try {
+      // 모든 스트리머 정보를 한 번에 가져옴
+      const streamersInfo = await this.getAllStreamersInfo();
+      console.log(`크롤링된 스트리머 수: ${streamersInfo.size}`);
+
+      // DB의 모든 스트리머 조회
+      const streamers = await this.streamerRepository.find({
+        where: {
+          soopId: IsNull(), // soopId가 없는 스트리머만 조회하거나
+          // soopId: Any  // 모든 스트리머를 조회할 경우
+        },
+      });
+
+      console.log(`DB의 스트리머 수: ${streamers.length}`);
+
+      // 각 스트리머 정보 업데이트
+      for (const streamer of streamers) {
+        const soopId = streamersInfo.get(streamer.name);
+
+        if (soopId) {
+          await this.streamerRepository.update(
+            { id: streamer.id },
+            {
+              soopId,
+              broadcastUrl: `https://ch.sooplive.co.kr/${soopId}`,
+              profileImageUrl: `https://profile.img.sooplive.co.kr/LOGO/${soopId.slice(0, 2)}/${soopId}/${soopId}.jpg`,
+            },
+          );
+          console.log(
+            `✅ ${streamer.name}의 soopId를 ${soopId}로 업데이트 완료`,
+          );
+        } else {
+          console.log(`❌ ${streamer.name}의 soopId를 찾을 수 없음`);
+        }
+      }
+
+      console.log('모든 스트리머 정보 업데이트 완료');
+    } catch (error) {
+      console.error('스트리머 일괄 업데이트 실패:', error);
+      throw error;
+    }
   }
 }

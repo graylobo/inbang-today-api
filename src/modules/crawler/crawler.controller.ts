@@ -20,4 +20,10 @@ export class CrawlerController {
   async saveMatchData(@Query() query: GetSaveMatchDataDto) {
     return this.crawlerService.saveMatchData(query);
   }
+
+  @Get('update-soop-ids')
+  async updateAllStreamersSoopId() {
+    await this.crawlerService.updateAllStreamersSoopId();
+    return { message: '스트리머 정보 업데이트가 완료되었습니다.' };
+  }
 }
