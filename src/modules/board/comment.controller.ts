@@ -9,10 +9,12 @@ import {
   Query,
   Request,
   UnauthorizedException,
+  UseGuards,
 } from '@nestjs/common';
 import { CommentService } from './comment.service';
 import { PostService } from './post.service';
 import * as bcrypt from 'bcrypt';
+import { JwtAuthGuard } from 'src/guards/jwt-auth.guard';
 
 @Controller('comments')
 export class CommentController {
@@ -27,6 +29,7 @@ export class CommentController {
   }
 
   @Post()
+  @UseGuards(JwtAuthGuard)
   async create(@Body() commentData: any, @Request() req: any) {
     const post = await this.postService.findById(commentData.postId);
 
@@ -35,13 +38,14 @@ export class CommentController {
       if (!req.user) {
         throw new UnauthorizedException('로그인이 필요합니다.');
       }
-      commentData.author = { id: req.user.id };
+      commentData.author = { id: req.user.userId };
     }
 
     return this.commentService.create(commentData);
   }
 
   @Post(':parentId/reply')
+  @UseGuards(JwtAuthGuard)
   async createReply(
     @Param('parentId') parentId: string,
     @Body() replyData: any,
@@ -55,13 +59,14 @@ export class CommentController {
       if (!req.user) {
         throw new UnauthorizedException('로그인이 필요합니다.');
       }
-      replyData.author = { id: req.user.id };
+      replyData.author = { id: req.user.userId };
     }
 
     return this.commentService.createReply(+parentId, replyData);
   }
 
   @Put(':id')
+  @UseGuards(JwtAuthGuard)
   async update(
     @Param('id') id: string,
     @Body() updateData: any,
@@ -70,7 +75,10 @@ export class CommentController {
     const comment = await this.commentService.findById(+id);
 
     // 익명 댓글이 아닌 경우 작성자 확인
-    if (comment.author && (!req.user || comment.author.id !== req.user.id)) {
+    if (
+      comment.author &&
+      (!req.user || comment.author.id !== req.user.userId)
+    ) {
       throw new UnauthorizedException('수정 권한이 없습니다.');
     }
 
@@ -78,6 +86,7 @@ export class CommentController {
   }
 
   @Delete(':id')
+  @UseGuards(JwtAuthGuard)
   async delete(
     @Param('id') id: string,
     @Query('password') password: string,
@@ -86,7 +95,10 @@ export class CommentController {
     const comment = await this.commentService.findById(+id);
 
     // 익명 댓글이 아닌 경우 작성자 확인
-    if (comment.author && (!req.user || comment.author.id !== req.user.id)) {
+    if (
+      comment.author &&
+      (!req.user || comment.author.id !== req.user.userId)
+    ) {
       throw new UnauthorizedException('삭제 권한이 없습니다.');
     }
 
