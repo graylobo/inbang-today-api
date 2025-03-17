@@ -73,6 +73,13 @@ export class CommentController {
     @Request() req: any,
   ) {
     const comment = await this.commentService.findById(+id);
+    const post = await this.postService.findById(comment.post.id);
+
+    if (post.board.isAnonymous && !comment.author) {
+      throw new UnauthorizedException(
+        '익명 게시판의 댓글은 수정할 수 없습니다.',
+      );
+    }
 
     // 익명 댓글이 아닌 경우 작성자 확인
     if (
