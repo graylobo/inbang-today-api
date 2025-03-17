@@ -43,6 +43,9 @@ export class PostController {
         throw new UnauthorizedException('로그인이 필요합니다.');
       }
       postData.author = { id: req.user.userId };
+    } else {
+      // 익명 게시판인 경우 IP 주소 저장
+      postData.ipAddress = req.ip || req.connection.remoteAddress;
     }
 
     return this.postService.create(postData);

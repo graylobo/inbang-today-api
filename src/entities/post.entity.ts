@@ -33,6 +33,9 @@ export class Post extends BaseEntity {
   @Column({ nullable: true })
   password: string; // 익명 게시글 비밀번호 (해시됨)
 
+  @Column({ nullable: true })
+  ipAddress: string; // 익명 게시글 작성자 IP 주소
+
   @Column({ default: 0 })
   viewCount: number;
 

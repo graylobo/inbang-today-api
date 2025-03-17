@@ -39,6 +39,9 @@ export class CommentController {
         throw new UnauthorizedException('로그인이 필요합니다.');
       }
       commentData.author = { id: req.user.userId };
+    } else {
+      // 익명 게시판인 경우 IP 주소 저장
+      commentData.ipAddress = req.ip || req.connection.remoteAddress;
     }
 
     return this.commentService.create(commentData);
@@ -60,6 +63,9 @@ export class CommentController {
         throw new UnauthorizedException('로그인이 필요합니다.');
       }
       replyData.author = { id: req.user.userId };
+    } else {
+      // 익명 게시판인 경우 IP 주소 저장
+      replyData.ipAddress = req.ip || req.connection.remoteAddress;
     }
 
     return this.commentService.createReply(+parentId, replyData);

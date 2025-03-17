@@ -30,6 +30,9 @@ export class Comment {
   @Column({ nullable: true })
   password: string; // 익명 댓글 비밀번호 (해시됨)
 
+  @Column({ nullable: true })
+  ipAddress: string; // 익명 댓글 작성자 IP 주소
+
   @ManyToOne(() => Comment, (comment) => comment.replies, { nullable: true })
   parent: Comment | null; // 대댓글인 경우 부모 댓글
 
