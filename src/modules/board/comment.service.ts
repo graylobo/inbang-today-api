@@ -66,7 +66,15 @@ export class CommentService {
       }
     }
 
-    await this.commentRepository.update(id, commentData);
+    const updateData: any = {
+      content: commentData.content,
+    };
+
+    if (commentData.authorName !== undefined) {
+      updateData.authorName = commentData.authorName;
+    }
+
+    await this.commentRepository.update(id, updateData);
     return this.commentRepository.findOne({
       where: { id },
       relations: ['author'],

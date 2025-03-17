@@ -77,6 +77,11 @@ export class PostService {
       content: postData.content,
     };
 
+    // 익명 게시글인 경우 작성자명 업데이트
+    if (postData.authorName !== undefined) {
+      updateData.authorName = postData.authorName;
+    }
+
     // boardId가 제공되었고 현재 게시판과 다른 경우에만 board 관계 업데이트
     if (postData.boardId && post.board.id !== postData.boardId) {
       updateData.board = { id: postData.boardId };
