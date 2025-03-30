@@ -1,15 +1,10 @@
-import {
-  Entity,
-  PrimaryGeneratedColumn,
-  Column,
-  ManyToOne,
-  CreateDateColumn,
-} from 'typeorm';
+import { Entity, PrimaryGeneratedColumn, Column, ManyToOne } from 'typeorm';
 import { Crew } from './crew.entity';
 import { User } from 'src/entities/user.entity';
+import { BaseEntity } from 'src/entities/base.entity';
 
 @Entity()
-export class CrewBroadcast {
+export class CrewBroadcast extends BaseEntity {
   @PrimaryGeneratedColumn()
   id: number;
 
@@ -21,9 +16,6 @@ export class CrewBroadcast {
 
   @Column({ type: 'date' })
   broadcastDate: Date;
-
-  @CreateDateColumn()
-  createdAt: Date;
 
   @ManyToOne(() => User)
   submittedBy: User;

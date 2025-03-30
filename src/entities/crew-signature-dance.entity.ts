@@ -1,15 +1,10 @@
-import {
-  Entity,
-  PrimaryGeneratedColumn,
-  Column,
-  ManyToOne,
-  CreateDateColumn,
-} from 'typeorm';
+import { Column, Entity, ManyToOne, PrimaryGeneratedColumn } from 'typeorm';
+import { BaseEntity } from './base.entity';
 import { CrewSignature } from './crew-signature.entity';
 import { Streamer } from './streamer.entity';
 
 @Entity()
-export class CrewSignatureDance {
+export class CrewSignatureDance extends BaseEntity {
   @PrimaryGeneratedColumn()
   id: number;
 
@@ -26,7 +21,4 @@ export class CrewSignatureDance {
 
   @Column({ type: 'date' })
   performedAt: Date;
-
-  @CreateDateColumn()
-  createdAt: Date;
 }

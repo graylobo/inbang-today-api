@@ -1,19 +1,23 @@
 import { Entity, PrimaryGeneratedColumn, Column } from 'typeorm';
+import { BaseEntity } from './base.entity';
 
 @Entity()
-export class User {
+export class User extends BaseEntity {
   @PrimaryGeneratedColumn()
   id: number;
 
   @Column({ unique: true })
-  username: string;
+  name: string;
 
-  @Column()
+  @Column({ unique: true })
+  email: string;
+
+  @Column({ nullable: true })
+  socialId: string;
+
+  @Column({ nullable: true })
   password: string;
 
   @Column({ default: false })
   isAdmin: boolean;
-
-  @Column({ type: 'timestamp', default: () => 'CURRENT_TIMESTAMP' })
-  createdAt: Date;
 }

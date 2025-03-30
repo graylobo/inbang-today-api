@@ -1,17 +1,16 @@
+import { CrewSignatureDance } from 'src/entities/crew-signature-dance.entity';
 import {
-  Entity,
-  PrimaryGeneratedColumn,
   Column,
+  Entity,
   ManyToOne,
   OneToMany,
-  CreateDateColumn,
-  UpdateDateColumn,
+  PrimaryGeneratedColumn,
 } from 'typeorm';
+import { BaseEntity } from './base.entity';
 import { Crew } from './crew.entity';
-import { CrewSignatureDance } from 'src/entities/crew-signature-dance.entity';
 
 @Entity()
-export class CrewSignature {
+export class CrewSignature extends BaseEntity {
   @PrimaryGeneratedColumn()
   id: number;
 
@@ -34,10 +33,4 @@ export class CrewSignature {
     cascade: true,
   })
   dances: CrewSignatureDance[];
-
-  @CreateDateColumn()
-  createdAt: Date;
-
-  @UpdateDateColumn()
-  updatedAt: Date;
 }

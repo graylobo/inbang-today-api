@@ -1,15 +1,10 @@
-import {
-  Entity,
-  PrimaryGeneratedColumn,
-  Column,
-  ManyToOne,
-  CreateDateColumn,
-} from 'typeorm';
+import { Column, Entity, ManyToOne, PrimaryGeneratedColumn } from 'typeorm';
+import { BaseEntity } from './base.entity';
 import { Streamer } from './streamer.entity';
 import { User } from './user.entity';
 
 @Entity()
-export class CrewEarning {
+export class CrewEarning extends BaseEntity {
   @PrimaryGeneratedColumn()
   id: number;
 
@@ -24,9 +19,6 @@ export class CrewEarning {
 
   @Column({ type: 'date' })
   earningDate: Date;
-
-  @CreateDateColumn()
-  createdAt: Date;
 
   @Column({ default: 0 })
   reportCount: number;

@@ -1,17 +1,16 @@
+import { BaseEntity } from 'src/entities/base.entity';
 import {
-  Entity,
-  PrimaryGeneratedColumn,
   Column,
+  Entity,
   ManyToOne,
   OneToMany,
-  CreateDateColumn,
-  UpdateDateColumn,
+  PrimaryGeneratedColumn,
 } from 'typeorm';
 import { Post } from './post.entity';
 import { User } from './user.entity';
 
 @Entity()
-export class Comment {
+export class Comment extends BaseEntity {
   @PrimaryGeneratedColumn()
   id: number;
 
@@ -38,10 +37,4 @@ export class Comment {
 
   @OneToMany(() => Comment, (comment) => comment.parent)
   replies: Comment[]; // 대댓글 목록
-
-  @CreateDateColumn()
-  createdAt: Date;
-
-  @UpdateDateColumn()
-  updatedAt: Date;
 }
