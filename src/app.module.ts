@@ -63,14 +63,15 @@ console.log('process.env.DB_HOST', process.env.NODE_ENV);
       username: process.env.DB_USERNAME,
       password: process.env.DB_PASSWORD,
       database: process.env.DB_NAME,
-      ...(process.env.NODE_ENV === 'production' && {
-        ssl: {
-          ca: 'global-bundle.pem',
-        },
-        extra: {
-          ssl: { rejectUnauthorized: false },
-        },
-      }),
+      ...(process.env.NODE_ENV === 'production' &&
+        process.env.DISABLE_SSL !== 'true' && {
+          ssl: {
+            ca: 'global-bundle.pem',
+          },
+          extra: {
+            ssl: { rejectUnauthorized: false },
+          },
+        }),
       entities: [
         Crew,
         Streamer,
