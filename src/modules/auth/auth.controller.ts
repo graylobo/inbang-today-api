@@ -62,13 +62,12 @@ export class AuthController {
     const isProduction = this.configService.get('NODE_ENV') === 'production';
 
     console.log('isProduction:::', isProduction);
-    console.log('cookieDomain:::', this.getCookieDomain());
+
     res.cookie('access_token', access_token, {
       httpOnly: true,
       secure: isProduction,
       sameSite: isProduction ? 'none' : 'lax',
       path: '/',
-      domain: this.getCookieDomain(),
     });
 
     res.redirect(
