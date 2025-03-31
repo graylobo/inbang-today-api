@@ -59,13 +59,19 @@ export class AuthController {
   @Get('google/callback')
   async googleCallback(@Query('code') code: string, @Res() res: Response) {
     const access_token = await this.authService.googleLogin(code);
+    const isProduction = this.configService.get('NODE_ENV') === 'production';
 
-    // 토큰을 URL 파라미터로 전달
+    res.cookie('access_token', access_token, {
+      httpOnly: true,
+      secure: isProduction,
+      sameSite: isProduction ? 'none' : 'lax',
+      path: '/',
+      domain: this.getCookieDomain(),
+    });
+
     res.redirect(
-      `${this.configService.get('CLIENT_URL')}/auth/google/callback?token=${access_token}`,
+      `${this.configService.get('CLIENT_URL')}/auth/google/callback`,
     );
-
-    console.log('redirected:::');
   }
 
   @UseGuards(JwtAuthGuard)
