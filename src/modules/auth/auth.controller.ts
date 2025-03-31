@@ -58,6 +58,7 @@ export class AuthController {
 
   @Get('google/callback')
   async googleCallback(@Query('code') code: string, @Res() res: Response) {
+    console.log('googleCallback:::', code);
     const access_token = await this.authService.googleLogin(code);
     const isProduction = this.configService.get('NODE_ENV') === 'production';
 
