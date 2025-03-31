@@ -61,6 +61,8 @@ export class AuthController {
     const access_token = await this.authService.googleLogin(code);
     const isProduction = this.configService.get('NODE_ENV') === 'production';
 
+    console.log('isProduction:::', isProduction);
+    console.log('cookieDomain:::', this.getCookieDomain());
     res.cookie('access_token', access_token, {
       httpOnly: true,
       secure: isProduction,
