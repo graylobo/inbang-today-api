@@ -15,7 +15,9 @@ export class GoogleClient {
   constructor(private readonly configService: ConfigService) {}
 
   async getToken(code: string): Promise<string> {
+    console.log('getToken:::');
     const tokenUrl = 'https://oauth2.googleapis.com/token';
+    console.log('getToken2:::', this.configService.get('GOOGLE_CLIENT_ID'));
     const { data } = await axios.post(tokenUrl, {
       code,
       client_id: this.configService.get('GOOGLE_CLIENT_ID'),
