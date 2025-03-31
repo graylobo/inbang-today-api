@@ -10,6 +10,7 @@ export class UserController {
   @UseGuards(JwtAuthGuard)
   @Get('profile')
   async getProfile(@CurrentUser() userId: number) {
+    console.log('getProfile:::', userId);
     try {
       const user = await this.userService.findById(userId);
       return {

@@ -70,9 +70,14 @@ export class AuthController {
       domain: this.getCookieDomain(),
     });
 
+    console.log(
+      'this.configService.get("CLIENT_URL"):::',
+      this.configService.get('CLIENT_URL'),
+    );
     res.redirect(
       `${this.configService.get('CLIENT_URL')}/auth/google/callback`,
     );
+    console.log('redirected');
   }
 
   @UseGuards(JwtAuthGuard)
