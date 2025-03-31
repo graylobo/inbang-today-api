@@ -82,6 +82,6 @@ export class AuthController {
 
   private getCookieDomain(): string | undefined {
     const isProduction = this.configService.get('NODE_ENV') === 'production';
-    return isProduction ? '.coincoin.kr' : undefined;
+    return isProduction ? 'inbang-today-client.vercel.app' : undefined;
   }
 }
