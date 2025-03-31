@@ -64,6 +64,8 @@ export class AuthController {
     res.redirect(
       `${this.configService.get('CLIENT_URL')}/auth/google/callback?token=${access_token}`,
     );
+
+    console.log('redirected:::');
   }
 
   @UseGuards(JwtAuthGuard)
