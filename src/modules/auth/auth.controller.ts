@@ -58,7 +58,6 @@ export class AuthController {
 
   @Get('google/callback')
   async googleCallback(@Query('code') code: string, @Res() res: Response) {
-    console.log('googleCallback:::', code);
     const access_token = await this.authService.googleLogin(code);
     const isProduction = this.configService.get('NODE_ENV') === 'production';
 
@@ -70,14 +69,9 @@ export class AuthController {
       domain: this.getCookieDomain(),
     });
 
-    console.log(
-      'this.configService.get("CLIENT_URL"):::',
-      this.configService.get('CLIENT_URL'),
-    );
     res.redirect(
       `${this.configService.get('CLIENT_URL')}/auth/google/callback`,
     );
-    console.log('redirected');
   }
 
   @UseGuards(JwtAuthGuard)

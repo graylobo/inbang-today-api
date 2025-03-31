@@ -48,18 +48,12 @@ export class AuthService {
   }
 
   async googleLogin(code: string) {
-    console.log('googleLogin1:::');
     const accessToken = await this.googleClient.getToken(code);
-    console.log('googleLogin2:::');
     const userInfo = await this.googleClient.getUserInfo(accessToken);
-    console.log('googleLogin3:::');
     let user = await this.userService.findBySocialId(userInfo.socialId);
-    console.log('googleLogin4:::');
     if (!user) {
-      console.log('googleLogin5:::');
       user = await this.userService.create(userInfo);
     }
-    console.log('googleLogin6:::');
     return this.generateToken(user);
   }
 
