@@ -28,7 +28,6 @@ export class CrewService {
         .leftJoinAndSelect('members.rank', 'memberRank')
         .getMany();
 
-      console.log('Query result:', JSON.stringify(crews, null, 2));
       return crews;
     } catch (error) {
       console.error('Error in findAll:', error);
