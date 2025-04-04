@@ -14,6 +14,9 @@ COPY . .
 
 RUN npm run build
 
+# Playwright 브라우저 설치
+RUN npx playwright install chromium --with-deps
+
 FROM node:18-alpine AS production
 
 WORKDIR /app
