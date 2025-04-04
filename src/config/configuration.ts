@@ -21,7 +21,6 @@ export type Configuration = {
 };
 
 export default (): Configuration => {
-  console.log('config:::', process.env);
   return {
     database: {
       host: process.env.DB_HOST || 'localhost',
