@@ -1,40 +1,43 @@
-FROM node:18-alpine AS builder
+# 빌드 단계: Node.js 애플리케이션 빌드
+FROM node:18-slim AS builder
 
 WORKDIR /app
 
 # 빌드 의존성 설치
-RUN apk add --no-cache python3 make g++
+RUN apt-get update && apt-get install -y \
+    python3 \
+    make \
+    g++ \
+    && rm -rf /var/lib/apt/lists/*
 
 COPY package*.json ./
 
-# 모든 의존성 설치 (네이티브 모듈을 컨테이너 환경에서 빌드)
+# 모든 의존성 설치
 RUN npm ci
 
-COPY . . 
+COPY . .
 
 RUN npm run build
 
-# Playwright 브라우저 설치
-RUN npx playwright install chromium --with-deps
-
-FROM node:18-alpine AS production
+# 실행 단계: Playwright가 포함된 이미지
+FROM mcr.microsoft.com/playwright:v1.40.0-jammy AS production
 
 WORKDIR /app
 
-RUN apk add --no-cache python3 make g++
-
+# 프로덕션 의존성 복사
 COPY package*.json ./
-
-# 프로덕션 의존성만 설치 (네이티브 모듈을 현재 환경에서 다시 빌드)
 RUN npm ci --only=production
 
+# 빌드된 파일과 필요한 자산 복사
 COPY --from=builder /app/dist ./dist
 COPY --from=builder /app/global-bundle.pem ./global-bundle.pem
-COPY .env.production ./ 
+COPY .env.production ./
 
 ARG ENVIRONMENT=production
 ENV NODE_ENV=$ENVIRONMENT
 
+# 컨테이너 실행 시 노출할 포트
 EXPOSE 4000
 
+# 애플리케이션 실행
 CMD ["npm", "run", "start:prod"]
