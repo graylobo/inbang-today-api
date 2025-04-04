@@ -25,6 +25,9 @@ export class Streamer {
   soopId: string;
 
   @Column({ nullable: true })
+  eloBoardId: string;
+
+  @Column({ nullable: true })
   profileImageUrl: string;
 
   @Column({ nullable: true })
