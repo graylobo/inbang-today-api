@@ -25,7 +25,6 @@ export class UserService {
   async findById(id: number) {
     const user = await this.userRepository.findOne({
       where: { id },
-      select: ['id', 'socialId', 'email', 'name', 'createdAt', 'updatedAt'],
     });
     return user;
   }
