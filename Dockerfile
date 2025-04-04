@@ -19,8 +19,8 @@ COPY . .
 
 RUN npm run build
 
-# 실행 단계: Playwright가 포함된 이미지
-FROM mcr.microsoft.com/playwright:v1.40.0-jammy AS production
+# 실행 단계: 최신 Playwright 이미지 사용
+FROM mcr.microsoft.com/playwright:v1.49.0-jammy AS production
 
 WORKDIR /app
 
