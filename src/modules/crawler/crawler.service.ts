@@ -863,6 +863,8 @@ export class CrawlerService {
       }
 
       await page.click('#switch-13', { force: true });
+      await page.waitForTimeout(2000);
+      await this.smoothScroll(page);
 
       console.log('스트리머 정보 수집 시작...');
       const streamersInfo = await page.evaluate(() => {
@@ -982,5 +984,34 @@ export class CrawlerService {
       console.error('스트리머 일괄 업데이트 실패:', error);
       throw error;
     }
+  }
+
+  // 실제 사용자 마우스 스크롤처럼 동작하는 메서드
+  private async smoothScroll(page: any): Promise<void> {
+    await page.evaluate(async () => {
+      await new Promise<void>((resolve) => {
+        let totalHeight = 0;
+        const distance = 100; // 한 번에 스크롤할 픽셀 단위
+        const scrollInterval = setInterval(() => {
+          const scrollHeight = document.body.scrollHeight;
+          window.scrollBy(0, distance); // 현재 스크롤 위치에서 아래로 distance만큼 스크롤
+          totalHeight += distance;
+
+          console.log(`스크롤 중... ${totalHeight}px / ${scrollHeight}px`);
+
+          // 페이지 끝에 도달하거나 충분히 스크롤한 경우
+          if (totalHeight >= scrollHeight) {
+            clearInterval(scrollInterval);
+            // 페이지의 맨 하단으로 한 번 더 스크롤
+            window.scrollTo(0, document.body.scrollHeight);
+            console.log('스크롤 완료');
+            resolve();
+          }
+        }, 100); // 100ms마다 스크롤 (자연스러운 속도)
+      });
+    });
+
+    // 모든 콘텐츠가 로드될 시간을 추가로 부여
+    await page.waitForTimeout(3000);
   }
 }
