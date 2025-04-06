@@ -1,11 +1,12 @@
-import { Injectable } from '@nestjs/common';
+import { BadRequestException, Injectable } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { InjectRepository } from '@nestjs/typeorm';
 import * as bcrypt from 'bcrypt';
+import { ErrorCode } from 'src/common/enums/error-codes.enum';
 import { GoogleClient } from 'src/modules/auth/client/google.client';
+import { UserService } from 'src/modules/user/user.service';
 import { Repository } from 'typeorm';
 import { User } from '../../entities/user.entity';
-import { UserService } from 'src/modules/user/user.service';
 
 @Injectable()
 export class AuthService {
@@ -19,6 +20,9 @@ export class AuthService {
 
   async validateUser(name: string, password: string): Promise<any> {
     const user = await this.userRepository.findOne({ where: { name } });
+    if (!user) {
+      throw new BadRequestException(ErrorCode.INVALID_USERNAME_OR_PASSWORD);
+    }
     if (user && (await bcrypt.compare(password, user.password))) {
       const { password, ...result } = user;
       return result;
@@ -63,6 +67,15 @@ export class AuthService {
   }
 
   async createUser(userData: Partial<User>): Promise<User> {
+    // Check if user with the same name or email already exists
+    const existingUser = await this.userRepository.findOne({
+      where: [{ name: userData.name }, { email: userData.email }],
+    });
+
+    if (existingUser) {
+      throw new BadRequestException(ErrorCode.DUPLICATE_NAME);
+    }
+
     const user = this.userRepository.create(userData);
     return this.userRepository.save(user);
   }

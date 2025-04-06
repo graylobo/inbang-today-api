@@ -28,4 +28,11 @@ export class UserService {
     });
     return user;
   }
+
+  async findAll() {
+    return this.userRepository.find({
+      select: ['id', 'name', 'email', 'isAdmin'],
+      order: { name: 'ASC' },
+    });
+  }
 }

@@ -1,5 +1,6 @@
-import { Entity, PrimaryGeneratedColumn, Column } from 'typeorm';
+import { Entity, PrimaryGeneratedColumn, Column, OneToMany } from 'typeorm';
 import { BaseEntity } from './base.entity';
+import { UserCrewPermission } from './user-crew-permission.entity';
 
 @Entity()
 export class User extends BaseEntity {
@@ -9,7 +10,7 @@ export class User extends BaseEntity {
   @Column({ unique: true })
   name: string;
 
-  @Column({ unique: true })
+  @Column({ unique: true, nullable: true })
   email: string;
 
   @Column({ nullable: true })
@@ -20,4 +21,7 @@ export class User extends BaseEntity {
 
   @Column({ default: false })
   isAdmin: boolean;
+
+  @OneToMany(() => UserCrewPermission, (permission) => permission.user)
+  crewPermissions: UserCrewPermission[];
 }

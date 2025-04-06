@@ -3,9 +3,11 @@ import { Streamer } from './streamer.entity';
 import { CrewRank } from './crew-rank.entity';
 import { CrewBroadcast } from './crew-broadcast.entity';
 import { CrewSignature } from './crew-signature.entity';
+import { UserCrewPermission } from './user-crew-permission.entity';
+import { BaseEntity } from './base.entity';
 
 @Entity()
-export class Crew {
+export class Crew extends BaseEntity {
   @PrimaryGeneratedColumn()
   id: number;
 
@@ -29,4 +31,7 @@ export class Crew {
 
   @OneToMany(() => CrewSignature, (signature) => signature.crew)
   signatures: CrewSignature[];
+
+  @OneToMany(() => UserCrewPermission, (permission) => permission.crew)
+  userPermissions: UserCrewPermission[];
 }

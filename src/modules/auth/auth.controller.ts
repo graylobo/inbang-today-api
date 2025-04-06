@@ -28,32 +28,20 @@ export class AuthController {
       loginData.name,
       loginData.password,
     );
-    if (!user) {
-      throw new HttpException(
-        'Invalid username or password',
-        HttpStatus.UNAUTHORIZED,
-      );
-    }
+
     return this.authService.login(user);
   }
 
   @Post('register')
   async register(@Body() userData: { name: string; password: string }) {
-    try {
-      const hashedPassword = await this.authService.hashPassword(
-        userData.password,
-      );
-      const user = await this.authService.createUser({
-        name: userData.name,
-        password: hashedPassword,
-      });
-      return { message: 'User registered successfully', userId: user.id };
-    } catch (error) {
-      throw new HttpException(
-        'Failed to register user',
-        HttpStatus.INTERNAL_SERVER_ERROR,
-      );
-    }
+    const hashedPassword = await this.authService.hashPassword(
+      userData.password,
+    );
+    const user = await this.authService.createUser({
+      name: userData.name,
+      password: hashedPassword,
+    });
+    return { message: 'User registered successfully', userId: user.id };
   }
 
   @Get('google/callback')

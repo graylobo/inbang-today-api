@@ -15,6 +15,7 @@ import { Streamer } from './entities/streamer.entity';
 import { CrewRank } from './entities/crew-rank.entity';
 import { Crew } from './entities/crew.entity';
 import { User } from './entities/user.entity';
+import { UserCrewPermission } from './entities/user-crew-permission.entity';
 import { AuthModule } from './modules/auth/auth.module';
 import { BoardModule } from './modules/board/board.module';
 import { CrewBroadcastModule } from './modules/crew-broadcast/crew-broadcast.module';
@@ -23,6 +24,7 @@ import { StreamerModule } from './modules/streamer/streamer.module';
 import { CrewRankModule } from './modules/crew-rank/crew-rank.module';
 import { CrewSignatureModule } from './modules/crew-signature/crew-signature.module';
 import { CrewModule } from './modules/crew/crew.module';
+import { UserPermissionModule } from './modules/user-permission/user-permission.module';
 import { ScheduleModule } from '@nestjs/schedule';
 import { LiveStreamModule } from 'src/modules/live-stream/live-stream.module';
 import { EventEmitterModule } from '@nestjs/event-emitter';
@@ -77,6 +79,7 @@ import { StarCraftGameMatchHistory } from 'src/entities/starcraft-game-match-his
         CrewRank,
         CrewEarning,
         User,
+        UserCrewPermission,
         CrewBroadcast,
         CrewSignature,
         Board,
@@ -98,6 +101,7 @@ import { StarCraftGameMatchHistory } from 'src/entities/starcraft-game-match-his
     CrewBroadcastModule,
     CrawlerModule,
     CrewSignatureModule,
+    UserPermissionModule,
     BoardModule,
     LiveStreamModule,
     StarCraftGameMatchModule,
