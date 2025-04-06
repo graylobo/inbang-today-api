@@ -24,4 +24,27 @@ export class UserController {
       };
     }
   }
+
+  @UseGuards(JwtAuthGuard)
+  @Get()
+  async getAllUsers(@CurrentUser() userId: number) {
+    try {
+      const currentUser = await this.userService.findById(userId);
+      if (!currentUser.isAdmin) {
+        return {
+          success: false,
+          message: '관리자만 접근 가능합니다.',
+        };
+      }
+
+      const users = await this.userService.findAll();
+      return users;
+    } catch (error) {
+      console.error('Get all users error:', error);
+      return {
+        success: false,
+        message: error.message,
+      };
+    }
+  }
 }
