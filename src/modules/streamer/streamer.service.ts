@@ -2,10 +2,12 @@ import {
   Injectable,
   NotFoundException,
   InternalServerErrorException,
+  BadRequestException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Streamer } from '../../entities/streamer.entity';
+import { ErrorCode } from 'src/common/enums/error-codes.enum';
 
 @Injectable()
 export class StreamerService {
@@ -40,6 +42,14 @@ export class StreamerService {
   }
 
   async create(memberData: any): Promise<Streamer> {
+    const existingStreamer = await this.streamerRepository.findOne({
+      where: { name: memberData.name },
+    });
+
+    if (existingStreamer) {
+      throw new BadRequestException(ErrorCode.DUPLICATE_NAME);
+    }
+
     const member = this.streamerRepository.create({
       name: memberData.name,
       profileImageUrl: memberData.profileImageUrl,

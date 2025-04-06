@@ -10,7 +10,7 @@ import {
   S3Client,
 } from '@aws-sdk/client-s3';
 import { Inject, Injectable } from '@nestjs/common';
-import { CLOUDFRONT_CLIENT, S3_CLIENT } from 'src/constants/token';
+import { CLOUDFRONT_CLIENT, S3_CLIENT } from 'src/common/constants/token';
 
 import { ConfigService } from '@nestjs/config';
 

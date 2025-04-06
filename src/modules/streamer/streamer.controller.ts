@@ -40,14 +40,7 @@ export class StreamerController {
   @UseGuards(AdminGuard)
   @Post()
   async create(@Body() memberData: Partial<Streamer>): Promise<Streamer> {
-    try {
-      return await this.streamerService.create(memberData);
-    } catch (error) {
-      throw new HttpException(
-        'Failed to create member',
-        HttpStatus.INTERNAL_SERVER_ERROR,
-      );
-    }
+    return await this.streamerService.create(memberData);
   }
 
   @UseGuards(AdminGuard)

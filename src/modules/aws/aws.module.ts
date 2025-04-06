@@ -3,7 +3,7 @@ import { ConfigService } from '@nestjs/config';
 import { S3Service } from 'src/modules/aws/services/s3/s3.service';
 
 import { AwsProvider } from './providers/aws.provider';
-import { CLOUDFRONT_CLIENT, S3_CLIENT } from 'src/constants/token';
+import { CLOUDFRONT_CLIENT, S3_CLIENT } from 'src/common/constants/token';
 
 @Module({
   providers: [
