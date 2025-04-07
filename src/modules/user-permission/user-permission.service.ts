@@ -2,12 +2,14 @@ import {
   Injectable,
   NotFoundException,
   ForbiddenException,
+  BadRequestException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { UserCrewPermission } from '../../entities/user-crew-permission.entity';
 import { User } from '../../entities/user.entity';
 import { Crew } from '../../entities/crew.entity';
+import { ErrorCode } from 'src/common/enums/error-codes.enum';
 
 @Injectable()
 export class UserPermissionService {
@@ -87,13 +89,17 @@ export class UserPermissionService {
   }
 
   async getCrewsWithPermission(userId: number): Promise<Crew[]> {
+    if (!userId) {
+      throw new BadRequestException(ErrorCode.NOT_FOUND_USER);
+    }
+
     const user = await this.userRepository.findOne({ where: { id: userId } });
     if (!user) {
       throw new NotFoundException(`User with ID ${userId} not found`);
     }
 
-    // SuperAdmin 또는 Admin은 모든 크루에 접근 가능
-    if (user.isSuperAdmin || user.isAdmin) {
+    // SuperAdmin만 모든 크루에 접근 가능
+    if (user.isSuperAdmin) {
       return this.crewRepository.find();
     }
 
@@ -118,11 +124,6 @@ export class UserPermissionService {
 
     // SuperAdmin은 모든 크루에 대한 권한 있음
     if (user.isSuperAdmin) {
-      return true;
-    }
-
-    // Admin도 모든 크루에 대한 권한 있음
-    if (user.isAdmin) {
       return true;
     }
 

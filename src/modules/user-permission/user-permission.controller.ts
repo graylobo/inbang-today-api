@@ -11,7 +11,6 @@ import {
 import { UserPermissionService } from './user-permission.service';
 import { AssignPermissionDto } from './dto/assign-permission.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
-import { User } from '../../common/decorators/user.decorator';
 import { CurrentUser } from 'src/modules/auth/decorators/current-user.decorator';
 
 @Controller('user-permissions')
@@ -24,7 +23,9 @@ export class UserPermissionController {
     @Body() assignPermissionDto: AssignPermissionDto,
     @CurrentUser() user: any,
   ) {
-    const isSuperAdmin = await this.userPermissionService.isSuperAdmin(user);
+    const isSuperAdmin = await this.userPermissionService.isSuperAdmin(
+      user.userId,
+    );
     if (!isSuperAdmin) {
       throw new ForbiddenException('Only superAdmins can assign permissions');
     }
@@ -39,7 +40,7 @@ export class UserPermissionController {
   async removePermission(
     @Param('userId') userId: number,
     @Param('crewId') crewId: number,
-    @User() user: any,
+    @CurrentUser() user: any,
   ) {
     // Only superAdmins can remove permissions
     const isSuperAdmin = await this.userPermissionService.isSuperAdmin(
@@ -53,12 +54,15 @@ export class UserPermissionController {
   }
 
   @Get('user/:userId')
-  async getUserPermissions(@Param('userId') userId: number, @User() user: any) {
+  async getUserPermissions(
+    @Param('userId') userId: number,
+    @CurrentUser() user: any,
+  ) {
     // SuperAdmin can see all permissions, users can only see their own
     const isSuperAdmin = await this.userPermissionService.isSuperAdmin(
       user.userId,
     );
-    if (!isSuperAdmin && user.id !== +userId) {
+    if (!isSuperAdmin && user.userId !== +userId) {
       throw new ForbiddenException('You can only view your own permissions');
     }
 
@@ -66,25 +70,27 @@ export class UserPermissionController {
   }
 
   @Get('me/crews')
-  async getMyPermittedCrews(@User() user: any) {
-    return this.userPermissionService.getCrewsWithPermission(user.id);
+  async getMyPermittedCrews(@CurrentUser() user: any) {
+    return this.userPermissionService.getCrewsWithPermission(user.userId);
   }
 
   @Get('check/:crewId')
   async checkCrewPermission(
     @Param('crewId') crewId: number,
-    @User() user: any,
+    @CurrentUser() user: any,
   ) {
     const hasPermission = await this.userPermissionService.hasPermissionForCrew(
-      user.id,
+      user.userId,
       crewId,
     );
     return { hasPermission };
   }
 
   @Get('is-super-admin')
-  async checkSuperAdmin(@User() user: any) {
-    const isSuperAdmin = await this.userPermissionService.isSuperAdmin(user.id);
+  async checkSuperAdmin(@CurrentUser() user: any) {
+    const isSuperAdmin = await this.userPermissionService.isSuperAdmin(
+      user.userId,
+    );
     return { isSuperAdmin };
   }
 }

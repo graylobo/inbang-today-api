@@ -17,12 +17,12 @@ export class UserController {
 
   @UseGuards(JwtAuthGuard)
   @Get('profile')
-  async getProfile(@CurrentUser() userId: number) {
+  async getProfile(@CurrentUser() user: any) {
     try {
-      const user = await this.userService.findById(userId);
+      const currentUser = await this.userService.findById(user.userId);
       return {
         success: true,
-        data: user,
+        data: currentUser,
       };
     } catch (error) {
       console.error('Profile error:', error);
@@ -35,9 +35,9 @@ export class UserController {
 
   @UseGuards(JwtAuthGuard)
   @Get()
-  async getAllUsers(@CurrentUser() userId: number) {
+  async getAllUsers(@CurrentUser() user: any) {
     try {
-      const currentUser = await this.userService.findById(userId);
+      const currentUser = await this.userService.findById(user.userId);
       if (!currentUser.isSuperAdmin) {
         return {
           success: false,
@@ -59,12 +59,12 @@ export class UserController {
   @UseGuards(JwtAuthGuard)
   @Patch(':userId/admin')
   async toggleAdminStatus(
-    @CurrentUser() userId: number,
+    @CurrentUser() user: any,
     @Param('userId') targetUserId: number,
     @Body() data: { isAdmin: boolean },
   ) {
     try {
-      const currentUser = await this.userService.findById(userId);
+      const currentUser = await this.userService.findById(user.userId);
 
       // 슈퍼 관리자만 관리자 권한을 토글할 수 있음
       if (!currentUser.isSuperAdmin) {
@@ -86,12 +86,12 @@ export class UserController {
   @UseGuards(JwtAuthGuard)
   @Patch(':userId/super-admin')
   async toggleSuperAdminStatus(
-    @CurrentUser() userId: number,
+    @CurrentUser() user: any,
     @Param('userId') targetUserId: number,
     @Body() data: { isSuperAdmin: boolean },
   ) {
     try {
-      const currentUser = await this.userService.findById(userId);
+      const currentUser = await this.userService.findById(user.userId);
 
       // 슈퍼 관리자만 다른 슈퍼 관리자 권한을 토글할 수 있음
       if (!currentUser.isSuperAdmin) {
@@ -101,7 +101,7 @@ export class UserController {
       }
 
       // 자기 자신의 슈퍼 관리자 권한은 제거할 수 없음 (최소 1명의 슈퍼 관리자가 필요)
-      if (Number(targetUserId) === userId && !data.isSuperAdmin) {
+      if (Number(targetUserId) === user.userId && !data.isSuperAdmin) {
         throw new ForbiddenException(
           '자신의 슈퍼 관리자 권한은 제거할 수 없습니다.',
         );
