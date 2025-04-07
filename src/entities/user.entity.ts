@@ -22,6 +22,9 @@ export class User extends BaseEntity {
   @Column({ default: false })
   isAdmin: boolean;
 
+  @Column({ default: false })
+  isSuperAdmin: boolean;
+
   @OneToMany(() => UserCrewPermission, (permission) => permission.user)
   crewPermissions: UserCrewPermission[];
 }

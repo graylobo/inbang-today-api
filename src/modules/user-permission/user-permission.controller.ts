@@ -11,7 +11,8 @@ import {
 import { UserPermissionService } from './user-permission.service';
 import { AssignPermissionDto } from './dto/assign-permission.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
-import { User } from 'src/common/decorators/user.decorator';
+import { User } from '../../common/decorators/user.decorator';
+import { CurrentUser } from 'src/modules/auth/decorators/current-user.decorator';
 
 @Controller('user-permissions')
 @UseGuards(JwtAuthGuard)
@@ -21,11 +22,11 @@ export class UserPermissionController {
   @Post()
   async assignPermission(
     @Body() assignPermissionDto: AssignPermissionDto,
-    @User() user: any,
+    @CurrentUser() user: any,
   ) {
-    // Only admins can assign permissions
-    if (!user.isAdmin) {
-      throw new ForbiddenException('Only admins can assign permissions');
+    const isSuperAdmin = await this.userPermissionService.isSuperAdmin(user);
+    if (!isSuperAdmin) {
+      throw new ForbiddenException('Only superAdmins can assign permissions');
     }
 
     return this.userPermissionService.assignCrewPermission(
@@ -40,9 +41,12 @@ export class UserPermissionController {
     @Param('crewId') crewId: number,
     @User() user: any,
   ) {
-    // Only admins can remove permissions
-    if (!user.isAdmin) {
-      throw new ForbiddenException('Only admins can remove permissions');
+    // Only superAdmins can remove permissions
+    const isSuperAdmin = await this.userPermissionService.isSuperAdmin(
+      user.userId,
+    );
+    if (!isSuperAdmin) {
+      throw new ForbiddenException('Only superAdmins can remove permissions');
     }
 
     return this.userPermissionService.removeCrewPermission(userId, crewId);
@@ -50,8 +54,11 @@ export class UserPermissionController {
 
   @Get('user/:userId')
   async getUserPermissions(@Param('userId') userId: number, @User() user: any) {
-    // Users can only see their own permissions, admins can see all
-    if (!user.isAdmin && user.id !== +userId) {
+    // SuperAdmin can see all permissions, users can only see their own
+    const isSuperAdmin = await this.userPermissionService.isSuperAdmin(
+      user.userId,
+    );
+    if (!isSuperAdmin && user.id !== +userId) {
       throw new ForbiddenException('You can only view your own permissions');
     }
 
@@ -60,11 +67,6 @@ export class UserPermissionController {
 
   @Get('me/crews')
   async getMyPermittedCrews(@User() user: any) {
-    // If user is admin, they have access to all crews
-    if (user.isAdmin) {
-      return this.userPermissionService.getAllCrews();
-    }
-
     return this.userPermissionService.getCrewsWithPermission(user.id);
   }
 
@@ -78,5 +80,11 @@ export class UserPermissionController {
       crewId,
     );
     return { hasPermission };
+  }
+
+  @Get('is-super-admin')
+  async checkSuperAdmin(@User() user: any) {
+    const isSuperAdmin = await this.userPermissionService.isSuperAdmin(user.id);
+    return { isSuperAdmin };
   }
 }

@@ -18,7 +18,9 @@
     "test:cov": "jest --coverage",
     "test:debug": "node --inspect-brk -r tsconfig-paths/register -r ts-node/register node_modules/.bin/jest --runInBand",
     "test:e2e": "jest --config ./test/jest-e2e.json",
-    "seed": "ts-node src/database/seeds/run-seed.ts"
+    "seed": "ts-node src/database/seeds/run-seed.ts",
+    "create:superadmin": "ts-node -r tsconfig-paths/register src/scripts/create-super-admin.ts",
+    "create:superadmin:id": "ts-node -r tsconfig-paths/register src/scripts/create-super-admin.ts --id"
   },
   "dependencies": {
     "@aws-sdk/client-cloudfront": "^3.723.0",

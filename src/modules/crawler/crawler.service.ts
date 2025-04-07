@@ -133,7 +133,6 @@ export class CrawlerService {
       const getResponse = await firstValueFrom(
         this.httpService.get(eloBoardUrl),
       );
-      console.log(getResponse);
       // const response = await firstValueFrom(
       //   this.httpService.post(eloBoardUrl, formData.toString(), {
       //     headers: {

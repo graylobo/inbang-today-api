@@ -25,6 +25,7 @@ export class UserPermissionService {
     crewId: number,
   ): Promise<UserCrewPermission> {
     const user = await this.userRepository.findOne({ where: { id: userId } });
+
     if (!user) {
       throw new NotFoundException(`User with ID ${userId} not found`);
     }
@@ -86,6 +87,17 @@ export class UserPermissionService {
   }
 
   async getCrewsWithPermission(userId: number): Promise<Crew[]> {
+    const user = await this.userRepository.findOne({ where: { id: userId } });
+    if (!user) {
+      throw new NotFoundException(`User with ID ${userId} not found`);
+    }
+
+    // SuperAdmin 또는 Admin은 모든 크루에 접근 가능
+    if (user.isSuperAdmin || user.isAdmin) {
+      return this.crewRepository.find();
+    }
+
+    // 일반 사용자는 권한이 있는 크루만 접근 가능
     const permissions = await this.userCrewPermissionRepository.find({
       where: { user: { id: userId } },
       relations: ['crew'],
@@ -104,12 +116,17 @@ export class UserPermissionService {
       throw new NotFoundException(`User with ID ${userId} not found`);
     }
 
-    // Admin has permission for all crews
+    // SuperAdmin은 모든 크루에 대한 권한 있음
+    if (user.isSuperAdmin) {
+      return true;
+    }
+
+    // Admin도 모든 크루에 대한 권한 있음
     if (user.isAdmin) {
       return true;
     }
 
-    // Check specific permission
+    // 특정 크루 권한 확인
     const permission = await this.userCrewPermissionRepository.findOne({
       where: {
         user: { id: userId },
@@ -128,5 +145,15 @@ export class UserPermissionService {
         'You do not have permission to edit this crew',
       );
     }
+  }
+
+  // SuperAdmin 권한 확인 메서드
+  async isSuperAdmin(userId: number): Promise<boolean> {
+    const user = await this.userRepository.findOne({ where: { id: userId } });
+    if (!user) {
+      throw new NotFoundException(`User with ID ${userId} not found`);
+    }
+
+    return user.isSuperAdmin;
   }
 }
