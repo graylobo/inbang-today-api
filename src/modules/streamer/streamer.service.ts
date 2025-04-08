@@ -8,17 +8,25 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Streamer } from '../../entities/streamer.entity';
 import { ErrorCode } from 'src/common/enums/error-codes.enum';
+import { StreamerCategoryService } from '../category/streamer-category.service';
+import { In } from 'typeorm';
 
 @Injectable()
 export class StreamerService {
   constructor(
     @InjectRepository(Streamer)
     private streamerRepository: Repository<Streamer>,
+    private streamerCategoryService: StreamerCategoryService,
   ) {}
 
   async findAll(): Promise<Streamer[]> {
     return this.streamerRepository.find({
-      relations: ['crew', 'rank'],
+      relations: [
+        'crew',
+        'rank',
+        'streamerCategories',
+        'streamerCategories.category',
+      ],
       order: {
         crew: { name: 'ASC' },
         rank: { level: 'ASC' },
@@ -29,7 +37,12 @@ export class StreamerService {
   async findAllByCrewId(crewId: number): Promise<Streamer[]> {
     return this.streamerRepository.find({
       where: { crew: { id: crewId } },
-      relations: ['rank', 'crew'],
+      relations: [
+        'rank',
+        'crew',
+        'streamerCategories',
+        'streamerCategories.category',
+      ],
       order: { rank: { level: 'ASC' } },
     });
   }
@@ -37,7 +50,12 @@ export class StreamerService {
   async findOne(id: number): Promise<Streamer> {
     return this.streamerRepository.findOne({
       where: { id },
-      relations: ['rank', 'crew'],
+      relations: [
+        'rank',
+        'crew',
+        'streamerCategories',
+        'streamerCategories.category',
+      ],
     });
   }
 
@@ -57,33 +75,64 @@ export class StreamerService {
       crew: { id: memberData.crewId },
       rank: { id: memberData.rankId },
     });
-    return this.streamerRepository.save(member);
+
+    const savedMember = await this.streamerRepository.save(member);
+
+    // 카테고리가 제공된 경우, 카테고리 설정
+    if (memberData.categoryIds && memberData.categoryIds.length > 0) {
+      await this.streamerCategoryService.setStreamerCategories(
+        savedMember.id,
+        memberData.categoryIds,
+      );
+
+      // 카테고리 관계를 포함하여 다시 조회
+      return this.findOne(savedMember.id);
+    }
+
+    return savedMember;
   }
 
   async update(id: number, memberData: any): Promise<Streamer> {
-    const updateData: any = {
-      name: memberData.name,
-      profileImageUrl: memberData.profileImageUrl,
-      broadcastUrl: memberData.broadcastUrl,
-    };
-
-    if (memberData.crewId) {
-      updateData.crew = { id: memberData.crewId };
+    const member = await this.findOne(id);
+    if (!member) {
+      throw new NotFoundException(`Member with ID ${id} not found`);
     }
 
-    if (memberData.rankId) {
-      updateData.rank = { id: memberData.rankId };
+    // 기본 정보 업데이트
+    if (memberData.name) member.name = memberData.name;
+    if (memberData.profileImageUrl !== undefined)
+      member.profileImageUrl = memberData.profileImageUrl;
+    if (memberData.broadcastUrl !== undefined)
+      member.broadcastUrl = memberData.broadcastUrl;
+    if (memberData.crewId) member.crew = { id: memberData.crewId } as any;
+    if (memberData.rankId) member.rank = { id: memberData.rankId } as any;
+    if (memberData.nickname !== undefined)
+      member.nickname = memberData.nickname;
+    if (memberData.soopId !== undefined) member.soopId = memberData.soopId;
+    if (memberData.race !== undefined) member.race = memberData.race;
+    if (memberData.tier !== undefined) member.tier = memberData.tier;
+
+    const updatedMember = await this.streamerRepository.save(member);
+
+    // 카테고리 업데이트 (제공된 경우)
+    if (memberData.categoryIds) {
+      await this.streamerCategoryService.setStreamerCategories(
+        id,
+        memberData.categoryIds,
+      );
+
+      // 업데이트된 카테고리 관계를 포함하여 다시 조회
+      return this.findOne(id);
     }
 
-    await this.streamerRepository.update(id, updateData);
-    return this.findOne(id);
+    return updatedMember;
   }
 
   async delete(id: number): Promise<void> {
     try {
       const member = await this.streamerRepository.findOne({
         where: { id },
-        relations: ['earnings'],
+        relations: ['earnings', 'streamerCategories'],
       });
 
       if (!member) {
@@ -97,5 +146,30 @@ export class StreamerService {
       }
       throw new InternalServerErrorException('Failed to delete member');
     }
+  }
+
+  // 특정 카테고리에 속한 모든 스트리머 조회
+  async findStreamersByCategory(categoryId: number): Promise<Streamer[]> {
+    const streamerCategories =
+      await this.streamerCategoryService.findCategoryStreamers(categoryId);
+    if (!streamerCategories.length) return [];
+
+    // 스트리머 ID 추출
+    const streamerIds = streamerCategories.map((sc) => sc.streamer.id);
+
+    // 모든 스트리머 정보 조회
+    return this.streamerRepository.find({
+      where: { id: In(streamerIds) },
+      relations: [
+        'rank',
+        'crew',
+        'streamerCategories',
+        'streamerCategories.category',
+      ],
+      order: {
+        crew: { name: 'ASC' },
+        rank: { level: 'ASC' },
+      },
+    });
   }
 }

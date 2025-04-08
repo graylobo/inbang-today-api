@@ -8,6 +8,7 @@ import {
 import { Crew } from './crew.entity';
 import { CrewRank } from './crew-rank.entity';
 import { CrewEarning } from './crew-earning.entity';
+import { StreamerCategory } from './streamer-category.entity';
 import { StarCraftRace } from 'src/entities/types/streamer.type';
 
 @Entity()
@@ -51,4 +52,10 @@ export class Streamer {
 
   @OneToMany(() => CrewEarning, (earning) => earning.member)
   earnings: CrewEarning[];
+
+  @OneToMany(
+    () => StreamerCategory,
+    (streamerCategory) => streamerCategory.streamer,
+  )
+  streamerCategories: StreamerCategory[];
 }

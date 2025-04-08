@@ -16,6 +16,8 @@ import { CrewRank } from './entities/crew-rank.entity';
 import { Crew } from './entities/crew.entity';
 import { User } from './entities/user.entity';
 import { UserCrewPermission } from './entities/user-crew-permission.entity';
+import { Category } from './entities/category.entity';
+import { StreamerCategory } from './entities/streamer-category.entity';
 import { AuthModule } from './modules/auth/auth.module';
 import { BoardModule } from './modules/board/board.module';
 import { CrewBroadcastModule } from './modules/crew-broadcast/crew-broadcast.module';
@@ -36,6 +38,7 @@ import { AwsModule } from 'src/modules/aws/aws.module';
 import { validate } from 'src/config/env.validation';
 import configuration from 'src/config/configuration';
 import { StarCraftGameMatchHistory } from 'src/entities/starcraft-game-match-history.entity';
+import { CategoryModule } from './modules/category/category.module';
 
 @Module({
   imports: [
@@ -89,6 +92,8 @@ import { StarCraftGameMatchHistory } from 'src/entities/starcraft-game-match-his
         StarCraftGameMatch,
         StarCraftGameMatchHistory,
         StarCraftMap,
+        Category,
+        StreamerCategory,
       ],
       synchronize: true,
       // logging: true, // SQL 쿼리 로깅 활성화
@@ -107,6 +112,7 @@ import { StarCraftGameMatchHistory } from 'src/entities/starcraft-game-match-his
     StarCraftGameMatchModule,
     EditorModule,
     AwsModule,
+    CategoryModule,
   ],
   controllers: [AppController],
   providers: [AppService],

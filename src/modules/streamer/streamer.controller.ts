@@ -28,6 +28,13 @@ export class StreamerController {
     return this.streamerService.findAllByCrewId(+crewId);
   }
 
+  @Get('category/:categoryId')
+  async findByCategory(
+    @Param('categoryId') categoryId: string,
+  ): Promise<Streamer[]> {
+    return this.streamerService.findStreamersByCategory(+categoryId);
+  }
+
   @Get(':id')
   async findOne(@Param('id') id: string): Promise<Streamer> {
     const member = await this.streamerService.findOne(+id);
@@ -39,7 +46,9 @@ export class StreamerController {
 
   @UseGuards(AdminGuard)
   @Post()
-  async create(@Body() memberData: Partial<Streamer>): Promise<Streamer> {
+  async create(
+    @Body() memberData: Partial<Streamer> & { categoryIds?: number[] },
+  ): Promise<Streamer> {
     return await this.streamerService.create(memberData);
   }
 
@@ -47,7 +56,7 @@ export class StreamerController {
   @Put(':id')
   async update(
     @Param('id') id: string,
-    @Body() memberData: Partial<Streamer>,
+    @Body() memberData: Partial<Streamer> & { categoryIds?: number[] },
   ): Promise<Streamer> {
     try {
       const member = await this.streamerService.findOne(+id);
