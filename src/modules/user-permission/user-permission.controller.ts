@@ -10,8 +10,8 @@ import {
 } from '@nestjs/common';
 import { UserPermissionService } from './user-permission.service';
 import { AssignPermissionDto } from './dto/assign-permission.dto';
-import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { CurrentUser } from 'src/modules/auth/decorators/current-user.decorator';
+import { JwtAuthGuard } from 'src/guards/jwt-auth.guard';
 
 @Controller('user-permissions')
 @UseGuards(JwtAuthGuard)

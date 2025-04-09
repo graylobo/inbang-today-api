@@ -7,8 +7,8 @@ import {
   Body,
   ForbiddenException,
 } from '@nestjs/common';
+import { JwtAuthGuard } from 'src/guards/jwt-auth.guard';
 import { CurrentUser } from 'src/modules/auth/decorators/current-user.decorator';
-import { JwtAuthGuard } from 'src/modules/auth/guards/jwt-auth.guard';
 import { UserService } from 'src/modules/user/user.service';
 
 @Controller('user')

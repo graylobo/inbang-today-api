@@ -26,7 +26,7 @@ export class CategoryController {
     return this.categoryService.findOne(+id);
   }
 
-  @UseGuards(AdminGuard)
+  // @UseGuards(AdminGuard)
   @Post()
   async create(@Body() categoryData: Partial<Category>): Promise<Category> {
     return this.categoryService.create(categoryData);
