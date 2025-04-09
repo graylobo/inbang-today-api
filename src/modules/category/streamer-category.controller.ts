@@ -34,7 +34,7 @@ export class StreamerCategoryController {
   }
 
   // 스트리머에 카테고리 추가
-  @UseGuards(AdminGuard)
+  // @UseGuards(AdminGuard)
   @Post('streamer/:streamerId/category/:categoryId')
   async addCategoryToStreamer(
     @Param('streamerId') streamerId: string,

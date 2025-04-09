@@ -22,10 +22,25 @@ export class StreamerController {
   @Get()
   async findAll(
     @Query('categoryName') categoryName?: string,
+    @Query('categories') categories?: string,
   ): Promise<Streamer[]> {
+    // 여러 카테고리가 콤마로 구분되어 있는 경우
+    if (categories) {
+      const categoryNames = categories
+        .split(',')
+        .map((name) => name.trim())
+        .filter(Boolean);
+      if (categoryNames.length > 0) {
+        return this.streamerService.findAllByMultipleCategories(categoryNames);
+      }
+    }
+
+    // 단일 카테고리 이름인 경우
     if (categoryName) {
       return this.streamerService.findAllByCategoryName(categoryName);
     }
+
+    // 카테고리 필터가 없는 경우 전체 조회
     return this.streamerService.findAll();
   }
 

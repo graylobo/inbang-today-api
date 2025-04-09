@@ -1,10 +1,9 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, ILike } from 'typeorm';
+import { Repository, ILike, In } from 'typeorm';
 import { StreamerCategory } from '../../entities/streamer-category.entity';
 import { Streamer } from '../../entities/streamer.entity';
 import { Category } from '../../entities/category.entity';
-import { In } from 'typeorm';
 
 @Injectable()
 export class StreamerCategoryService {
@@ -52,6 +51,38 @@ export class StreamerCategoryService {
     const categoryIds = categories.map((category) => category.id);
 
     // 해당 카테고리에 속한 스트리머 관계 조회
+    return this.streamerCategoryRepository.find({
+      where: { category: { id: In(categoryIds) } },
+      relations: ['streamer'],
+    });
+  }
+
+  // 여러 카테고리 이름으로 스트리머 조회
+  async findStreamersByMultipleCategories(
+    categoryNames: string[],
+  ): Promise<StreamerCategory[]> {
+    if (!categoryNames.length) {
+      return [];
+    }
+
+    // 각 카테고리 이름에 대해 일치하는 카테고리 ID 찾기
+    const categoryIdsPromises = categoryNames.map(async (name) => {
+      const categories = await this.categoryRepository.find({
+        where: { name: ILike(`%${name}%`) },
+        select: ['id'],
+      });
+      return categories.map((category) => category.id);
+    });
+
+    // 모든 카테고리 ID 배열을 단일 배열로 합침
+    const categoryIdsArrays = await Promise.all(categoryIdsPromises);
+    const categoryIds = categoryIdsArrays.flat();
+
+    if (!categoryIds.length) {
+      return [];
+    }
+
+    // 해당 카테고리들에 속한 스트리머 관계 조회
     return this.streamerCategoryRepository.find({
       where: { category: { id: In(categoryIds) } },
       relations: ['streamer'],
