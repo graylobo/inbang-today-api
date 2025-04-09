@@ -1,5 +1,5 @@
 import { HttpService } from '@nestjs/axios';
-import { Injectable } from '@nestjs/common';
+import { BadRequestException, Injectable } from '@nestjs/common';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { Cron, CronExpression } from '@nestjs/schedule';
 import { InjectRepository } from '@nestjs/typeorm';
@@ -13,14 +13,16 @@ import {
 } from 'src/entities/starcraft-game-match.entity';
 import { StarCraftMap } from 'src/entities/starcraft-map.entity';
 import { Streamer } from 'src/entities/streamer.entity';
+import { Category } from 'src/entities/category.entity';
 import { StarCraftRace } from 'src/entities/types/streamer.type';
 import { STREAM_EVENTS } from 'src/events/stream.events';
 import { GetSaveMatchDataDto } from 'src/modules/crawler/dto/request/get-save-match-data.dto';
 import { TARGET_STREAMERS } from 'src/modules/crawler/metadata';
 import { StreamInfo } from 'src/modules/crawler/type';
 import { RedisService } from 'src/modules/redis/redis.service';
+import { StreamerCategoryService } from 'src/modules/category/streamer-category.service';
 import { formatDateString } from 'src/utils/format-date-string.utils';
-import { Between, In, Repository } from 'typeorm';
+import { Between, In, Repository, ILike } from 'typeorm';
 import { IsNull } from 'typeorm';
 
 export interface MatchData {
@@ -47,6 +49,9 @@ export class CrawlerService {
     private readonly starCraftMapRepository: Repository<StarCraftMap>,
     @InjectRepository(StarCraftGameMatch)
     private readonly starCraftGameMatchRepository: Repository<StarCraftGameMatch>,
+    @InjectRepository(Category)
+    private readonly categoryRepository: Repository<Category>,
+    private readonly streamerCategoryService: StreamerCategoryService,
     private readonly redisService: RedisService,
     private readonly eventEmitter: EventEmitter2,
     private readonly httpService: HttpService,
@@ -115,7 +120,7 @@ export class CrawlerService {
       return res;
     } catch (error) {
       console.error('크롤링 실패:', error);
-      throw new Error(`크롤링 실패: ${error.message}`);
+      throw new BadRequestException(`크롤링 실패: ${error.message}`);
     }
   }
 
@@ -660,7 +665,36 @@ export class CrawlerService {
     if (streamersToCreate.length > 0) {
       const newStreamers =
         await this.streamerRepository.save(streamersToCreate);
+
+      // 스트리머 캐시에 추가
       newStreamers.forEach((s) => existingStreamerMapCache.set(s.name, s));
+
+      // 스타크래프트 카테고리 찾기
+      const starcraftCategory = await this.categoryRepository.findOne({
+        where: { name: ILike('%starcraft%') },
+      });
+
+      if (starcraftCategory) {
+        // 각 신규 스트리머에 스타크래프트 카테고리 연결
+        for (const streamer of newStreamers) {
+          try {
+            await this.streamerCategoryService.addCategoryToStreamer(
+              streamer.id,
+              starcraftCategory.id,
+            );
+            console.log(
+              `Added starcraft category to streamer: ${streamer.name}`,
+            );
+          } catch (error) {
+            console.error(
+              `Failed to add category to streamer ${streamer.name}:`,
+              error,
+            );
+          }
+        }
+      } else {
+        console.warn('Starcraft category not found in the database');
+      }
     }
 
     // 새로운 맵 생성
