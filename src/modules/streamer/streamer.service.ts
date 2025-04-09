@@ -34,6 +34,38 @@ export class StreamerService {
     });
   }
 
+  async findAllByCategoryName(categoryName: string): Promise<Streamer[]> {
+    // 지정된 이름의 카테고리에 속한 스트리머를 조회
+    const categoriesWithStreamerIds =
+      await this.streamerCategoryService.findStreamersByCategoryName(
+        categoryName,
+      );
+
+    if (!categoriesWithStreamerIds.length) {
+      return [];
+    }
+
+    // 스트리머 ID 목록 추출
+    const streamerIds = [
+      ...new Set(categoriesWithStreamerIds.map((sc) => sc.streamer.id)),
+    ];
+
+    // 해당 ID에 해당하는 모든 스트리머 정보 조회 (관계 포함)
+    return this.streamerRepository.find({
+      where: { id: In(streamerIds) },
+      relations: [
+        'crew',
+        'rank',
+        'streamerCategories',
+        'streamerCategories.category',
+      ],
+      order: {
+        crew: { name: 'ASC' },
+        rank: { level: 'ASC' },
+      },
+    });
+  }
+
   async findAllByCrewId(crewId: number): Promise<Streamer[]> {
     return this.streamerRepository.find({
       where: { crew: { id: crewId } },

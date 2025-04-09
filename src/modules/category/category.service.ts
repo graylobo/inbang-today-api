@@ -14,6 +14,13 @@ export class CategoryService {
     return this.categoryRepository.find({ order: { sortOrder: 'ASC' } });
   }
 
+  async findByType(type: string): Promise<Category[]> {
+    return this.categoryRepository.find({
+      where: { name: type },
+      order: { sortOrder: 'ASC' },
+    });
+  }
+
   async findOne(id: number): Promise<Category> {
     const category = await this.categoryRepository.findOne({
       where: { id },

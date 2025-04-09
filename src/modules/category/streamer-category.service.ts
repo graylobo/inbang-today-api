@@ -1,9 +1,10 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { Repository, ILike } from 'typeorm';
 import { StreamerCategory } from '../../entities/streamer-category.entity';
 import { Streamer } from '../../entities/streamer.entity';
 import { Category } from '../../entities/category.entity';
+import { In } from 'typeorm';
 
 @Injectable()
 export class StreamerCategoryService {
@@ -30,6 +31,29 @@ export class StreamerCategoryService {
   async findCategoryStreamers(categoryId: number): Promise<StreamerCategory[]> {
     return this.streamerCategoryRepository.find({
       where: { category: { id: categoryId } },
+      relations: ['streamer'],
+    });
+  }
+
+  // 특정 카테고리 이름을 포함하는 모든 스트리머 조회
+  async findStreamersByCategoryName(
+    categoryName: string,
+  ): Promise<StreamerCategory[]> {
+    // 해당 이름을 포함하는 카테고리 ID 목록 조회 (대소문자 구분 없이)
+    const categories = await this.categoryRepository.find({
+      where: { name: ILike(`%${categoryName}%`) },
+      select: ['id'],
+    });
+
+    if (!categories.length) {
+      return [];
+    }
+
+    const categoryIds = categories.map((category) => category.id);
+
+    // 해당 카테고리에 속한 스트리머 관계 조회
+    return this.streamerCategoryRepository.find({
+      where: { category: { id: In(categoryIds) } },
       relations: ['streamer'],
     });
   }

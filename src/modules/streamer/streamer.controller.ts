@@ -8,6 +8,7 @@ import {
   Param,
   Post,
   Put,
+  Query,
   UseGuards,
 } from '@nestjs/common';
 import { Streamer } from '../../entities/streamer.entity';
@@ -19,7 +20,12 @@ export class StreamerController {
   constructor(private readonly streamerService: StreamerService) {}
 
   @Get()
-  async findAll(): Promise<Streamer[]> {
+  async findAll(
+    @Query('categoryName') categoryName?: string,
+  ): Promise<Streamer[]> {
+    if (categoryName) {
+      return this.streamerService.findAllByCategoryName(categoryName);
+    }
     return this.streamerService.findAll();
   }
 

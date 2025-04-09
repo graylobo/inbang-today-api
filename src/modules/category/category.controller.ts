@@ -7,6 +7,7 @@ import {
   Body,
   Param,
   UseGuards,
+  Query,
 } from '@nestjs/common';
 import { CategoryService } from './category.service';
 import { Category } from '../../entities/category.entity';
@@ -17,7 +18,10 @@ export class CategoryController {
   constructor(private readonly categoryService: CategoryService) {}
 
   @Get()
-  async findAll(): Promise<Category[]> {
+  async findAll(@Query('type') type?: string): Promise<Category[]> {
+    if (type) {
+      return this.categoryService.findByType(type);
+    }
     return this.categoryService.findAll();
   }
 
