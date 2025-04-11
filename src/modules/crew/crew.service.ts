@@ -100,17 +100,68 @@ export class CrewService {
     await this.crewRepository.update(id, crewInfo);
 
     if (ranks) {
-      // 기존 계급 삭제
-      await this.crewRankRepository.delete({ crew: { id } });
+      // 기존 랭크 조회
+      const existingRanks = await this.crewRankRepository.find({
+        where: { crew: { id } },
+        relations: ['crew'],
+      });
 
-      // 새로운 계급 생성
-      const rankEntities = ranks.map((rank) =>
-        this.crewRankRepository.create({
-          ...rank,
-          crew: { id },
-        }),
-      );
-      await this.crewRankRepository.save(rankEntities);
+      // 스트리머가 사용 중인 랭크 ID 조회
+      const usedRankIds = await this.checkRanksInUse(id);
+
+      if (ranks.length > 0) {
+        // 새 랭크와 기존 랭크 매핑
+        const existingRankMap = new Map(
+          existingRanks.map((rank) => [rank.id, rank]),
+        );
+
+        // 업데이트할 랭크와 새로 추가할 랭크 분리
+        const ranksToUpdate = [];
+        const ranksToAdd = [];
+
+        for (const rankData of ranks) {
+          if (rankData.id && existingRankMap.has(rankData.id)) {
+            // 기존 랭크 업데이트
+            ranksToUpdate.push({
+              id: rankData.id,
+              name: rankData.name,
+              level: rankData.level,
+              commission: rankData.commission,
+              iconUrl: rankData.iconUrl,
+            });
+          } else {
+            // 새 랭크 추가
+            ranksToAdd.push(
+              this.crewRankRepository.create({
+                ...rankData,
+                crew: { id },
+              }),
+            );
+          }
+        }
+
+        // 업데이트할 랭크가 있으면 업데이트
+        for (const rankUpdate of ranksToUpdate) {
+          await this.crewRankRepository.update(rankUpdate.id, rankUpdate);
+        }
+
+        // 새 랭크 추가
+        if (ranksToAdd.length > 0) {
+          await this.crewRankRepository.save(ranksToAdd);
+        }
+
+        // 삭제할 랭크 찾기 (요청에 포함되지 않은 기존 랭크)
+        const newRankIds = ranks.filter((r) => r.id).map((r) => r.id);
+        const ranksToRemove = existingRanks.filter(
+          (rank) =>
+            !newRankIds.includes(rank.id) && !usedRankIds.includes(rank.id),
+        );
+
+        // 사용 중이지 않은 랭크만 삭제
+        if (ranksToRemove.length > 0) {
+          await this.crewRankRepository.remove(ranksToRemove);
+        }
+      }
     }
 
     return this.findOne(id);
@@ -206,5 +257,24 @@ export class CrewService {
     return crewsWithEarnings.sort(
       (a, b) => b.monthlyEarnings - a.monthlyEarnings,
     );
+  }
+
+  // 스트리머가 사용 중인 랭크 ID 확인
+  private async checkRanksInUse(crewId: number): Promise<number[]> {
+    const result = await this.crewRepository
+      .createQueryBuilder('crew')
+      .leftJoinAndSelect('crew.members', 'members')
+      .leftJoinAndSelect('members.rank', 'rank')
+      .where('crew.id = :crewId', { crewId })
+      .getOne();
+
+    if (!result || !result.members || result.members.length === 0) {
+      return [];
+    }
+
+    // 스트리머가 사용 중인 랭크 ID 수집
+    return result.members
+      .filter((member) => member.rank && member.rank.id)
+      .map((member) => member.rank.id);
   }
 }

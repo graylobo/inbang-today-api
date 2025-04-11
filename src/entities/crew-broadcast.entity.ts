@@ -1,9 +1,16 @@
-import { Entity, PrimaryGeneratedColumn, Column, ManyToOne } from 'typeorm';
+import {
+  Entity,
+  PrimaryGeneratedColumn,
+  Column,
+  ManyToOne,
+  Unique,
+} from 'typeorm';
 import { Crew } from './crew.entity';
 import { User } from 'src/entities/user.entity';
 import { BaseEntity } from 'src/entities/base.entity';
 
 @Entity()
+@Unique(['crew', 'broadcastDate'])
 export class CrewBroadcast extends BaseEntity {
   @PrimaryGeneratedColumn()
   id: number;
