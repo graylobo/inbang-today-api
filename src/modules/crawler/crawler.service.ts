@@ -5,7 +5,7 @@ import { Cron, CronExpression } from '@nestjs/schedule';
 import { InjectRepository } from '@nestjs/typeorm';
 import * as cheerio from 'cheerio';
 import { Browser, chromium } from 'playwright';
-import { firstValueFrom, timeout } from 'rxjs';
+import { firstValueFrom } from 'rxjs';
 import { StarCraftGameMatchHistory } from 'src/entities/starcraft-game-match-history.entity';
 import {
   MatchOrigin,
@@ -14,7 +14,10 @@ import {
 import { StarCraftMap } from 'src/entities/starcraft-map.entity';
 import { Streamer } from 'src/entities/streamer.entity';
 import { Category } from 'src/entities/category.entity';
-import { StarCraftRace } from 'src/entities/types/streamer.type';
+import {
+  StarCraftRace,
+  StreamerGender,
+} from 'src/entities/types/streamer.type';
 import { STREAM_EVENTS } from 'src/events/stream.events';
 import { GetSaveMatchDataDto } from 'src/modules/crawler/dto/request/get-save-match-data.dto';
 import { TARGET_STREAMERS } from 'src/modules/crawler/metadata';
@@ -384,12 +387,13 @@ export class CrawlerService {
     );
     const existingMapCache = new Map(existingMaps.map((m) => [m.name, m]));
 
-    // 새로운 스트리머와 맵 생성
+    // 새로운 스트리머와 맵 생성 (origin 파라미터 추가)
     await this.createNewStreamersAndMaps(
       parsedStreamers,
       uniqueMaps,
       existingStreamerMapCache,
       existingMapCache,
+      origin, // origin 값 전달
     );
 
     // 매치 데이터 저장 및 처리된 매치 수 반환
@@ -656,6 +660,7 @@ export class CrawlerService {
     uniqueMaps: Set<string>,
     existingStreamerMapCache: Map<string, Streamer>,
     existingMapCache: Map<string, StarCraftMap>,
+    origin: MatchOrigin,
   ): Promise<void> {
     // 새로운 스트리머 생성
     const streamersToCreate = [...parsedStreamers.values()].filter(
@@ -663,8 +668,17 @@ export class CrawlerService {
     );
 
     if (streamersToCreate.length > 0) {
+      // MatchOrigin에 따라 gender 설정
+      const streamersWithGender = streamersToCreate.map((streamer) => ({
+        ...streamer,
+        gender:
+          origin === MatchOrigin.MEN
+            ? StreamerGender.Male
+            : StreamerGender.Female,
+      }));
+
       const newStreamers =
-        await this.streamerRepository.save(streamersToCreate);
+        await this.streamerRepository.save(streamersWithGender);
 
       // 스트리머 캐시에 추가
       newStreamers.forEach((s) => existingStreamerMapCache.set(s.name, s));

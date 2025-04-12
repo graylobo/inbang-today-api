@@ -3,3 +3,8 @@ export enum StarCraftRace {
   Protoss = 'Protoss',
   Zerg = 'Zerg',
 }
+
+export enum StreamerGender {
+  Male = 'Male',
+  Female = 'Female',
+}
