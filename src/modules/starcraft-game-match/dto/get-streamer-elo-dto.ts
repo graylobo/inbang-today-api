@@ -1,5 +1,6 @@
-import { IsNumber, IsOptional, IsDateString } from 'class-validator';
+import { IsNumber, IsOptional, IsDateString, IsEnum } from 'class-validator';
 import { Type } from 'class-transformer';
+import { StreamerGender } from 'src/entities/types/streamer.type';
 
 export class GetStreamerEloDto {
   @IsNumber()
@@ -13,4 +14,8 @@ export class GetStreamerEloDto {
   @IsOptional()
   @IsDateString()
   endDate?: string;
+
+  @IsOptional()
+  @IsEnum(StreamerGender)
+  gender?: StreamerGender;
 }

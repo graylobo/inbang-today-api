@@ -40,7 +40,7 @@ export class StarCraftGameMatchService {
   ) {}
 
   async findMatches(query: GetMatchHistoryDto): Promise<StarCraftGameMatch[]> {
-    const { streamerId, startDate, endDate, mapId } = query;
+    const { streamerId, startDate, endDate, mapId, gender } = query;
 
     const queryBuilder = this.starCraftGameMatchRepository
       .createQueryBuilder('match')
@@ -54,6 +54,20 @@ export class StarCraftGameMatchService {
         '(winner.id = :streamerId OR loser.id = :streamerId)',
         { streamerId },
       );
+    }
+
+    if (gender) {
+      if (streamerId) {
+        queryBuilder.andWhere(
+          '((winner.id = :streamerId AND winner.gender = :gender) OR (loser.id = :streamerId AND loser.gender = :gender))',
+          { streamerId, gender },
+        );
+      } else {
+        queryBuilder.andWhere(
+          '(winner.gender = :gender OR loser.gender = :gender)',
+          { gender },
+        );
+      }
     }
 
     if (startDate && endDate) {
@@ -152,6 +166,31 @@ export class StarCraftGameMatchService {
   }
 
   async getStreamerEloTotal(query: GetStreamerEloDto) {
+    // 스트리머 정보 조회 (gender 필터링 포함)
+    const streamer = await this.streamerRepository.findOne({
+      where: {
+        id: query.streamerId,
+        ...(query.gender ? { gender: query.gender } : {}),
+      },
+    });
+
+    // 스트리머가 없거나 gender 조건이 맞지 않으면 빈 결과 반환
+    if (!streamer) {
+      return {
+        streamerId: query.streamerId,
+        gender: query.gender,
+        totalEloPoints: 0,
+        gainedEloPoints: 0,
+        lostEloPoints: 0,
+        matchCount: 0,
+        wins: 0,
+        losses: 0,
+        winRate: 0,
+        startDate: query.startDate,
+        endDate: query.endDate,
+      };
+    }
+
     const queryBuilder = this.starCraftGameMatchRepository
       .createQueryBuilder('match')
       .leftJoinAndSelect('match.winner', 'winner')
@@ -177,33 +216,53 @@ export class StarCraftGameMatchService {
 
     let gainedEloPoints = 0;
     let lostEloPoints = 0;
-    let totalEloPoints = 0;
+    let wins = 0;
+    let losses = 0;
 
     matches.forEach((match) => {
       const isWinner = match.winner.id === Number(query.streamerId);
       if (isWinner) {
         gainedEloPoints += Number(match.eloPoint);
+        wins++;
       } else {
         lostEloPoints += Number(match.eloPoint);
+        losses++;
       }
     });
 
-    totalEloPoints = gainedEloPoints - lostEloPoints;
+    const totalEloPoints = gainedEloPoints - lostEloPoints;
+    const matchCount = matches.length;
+    const winRate = matchCount > 0 ? (wins / matchCount) * 100 : 0;
 
     return {
       streamerId: query.streamerId,
+      streamerName: streamer.name,
+      gender: streamer.gender,
+      totalEloPoints,
       gainedEloPoints,
       lostEloPoints,
-      totalEloPoints,
-      matchCount: matches.length,
+      matchCount,
+      wins,
+      losses,
+      winRate,
       startDate: query.startDate,
       endDate: query.endDate,
     };
   }
 
   async getStreamerEloRanking(query: GetStreamerEloRankingDto) {
-    // 먼저 모든 스트리머 조회
-    const streamers = await this.streamerRepository.find();
+    // streamer 조회 조건 설정
+    const streamerWhere: any = {};
+
+    // gender 필터 적용
+    if (query.gender) {
+      streamerWhere.gender = query.gender;
+    }
+
+    // 먼저 모든 스트리머 조회 (gender 필터 적용)
+    const streamers = await this.streamerRepository.find({
+      where: streamerWhere,
+    });
 
     // 각 스트리머별 ELO 포인트 집계를 위한 배열
     const streamerEloStats = [];
@@ -265,6 +324,7 @@ export class StarCraftGameMatchService {
       streamerEloStats.push({
         streamerId: streamer.id,
         streamerName: streamer.name,
+        gender: streamer.gender,
         gainedEloPoints,
         lostEloPoints,
         totalEloPoints,
@@ -282,6 +342,7 @@ export class StarCraftGameMatchService {
       ranking: streamerEloStats,
       startDate: query.startDate,
       endDate: query.endDate,
+      genderFilter: query.gender,
     };
   }
 }

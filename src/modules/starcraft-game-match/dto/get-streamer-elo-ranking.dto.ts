@@ -1,4 +1,5 @@
-import { IsOptional, IsDateString } from 'class-validator';
+import { IsEnum, IsOptional, IsDateString } from 'class-validator';
+import { StreamerGender } from 'src/entities/types/streamer.type';
 
 export class GetStreamerEloRankingDto {
   @IsOptional()
@@ -8,4 +9,8 @@ export class GetStreamerEloRankingDto {
   @IsOptional()
   @IsDateString()
   endDate?: string;
+
+  @IsOptional()
+  @IsEnum(StreamerGender)
+  gender?: StreamerGender;
 }

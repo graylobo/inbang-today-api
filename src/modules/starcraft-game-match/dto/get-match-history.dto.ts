@@ -1,11 +1,17 @@
-import { IsOptional, IsNumber, IsDateString } from 'class-validator';
+import { IsOptional, IsNumber, IsDateString, IsEnum } from 'class-validator';
 import { Type } from 'class-transformer';
+import { StreamerGender } from 'src/entities/types/streamer.type';
 
 export class GetMatchHistoryDto {
   @IsOptional()
   @IsNumber()
   @Type(() => Number)
   streamerId?: number;
+
+  @IsOptional()
+  @IsNumber()
+  @Type(() => Number)
+  mapId?: number;
 
   @IsOptional()
   @IsDateString()
@@ -16,7 +22,6 @@ export class GetMatchHistoryDto {
   endDate?: string;
 
   @IsOptional()
-  @IsNumber()
-  @Type(() => Number)
-  mapId?: number;
+  @IsEnum(StreamerGender)
+  gender?: StreamerGender;
 }
