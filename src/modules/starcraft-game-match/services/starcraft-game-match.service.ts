@@ -292,7 +292,7 @@ export class StarCraftGameMatchService {
 
     // 각 스트리머별로 ELO 포인트 집계
     for (const streamer of streamers) {
-      let gainedEloPoints = 0;
+      let gainedEloPoints = 1000;
       let lostEloPoints = 0;
       let matchCount = 0;
       let wins = 0;
@@ -317,8 +317,22 @@ export class StarCraftGameMatchService {
         matchCount++;
       });
 
+      // 최소 경기 수 필터 적용
+      if (query.minMatchCount && matchCount < query.minMatchCount) {
+        continue;
+      }
+
       const totalEloPoints = gainedEloPoints - lostEloPoints;
       const winRate = matchCount > 0 ? (wins / matchCount) * 100 : 0;
+
+      // 신뢰도 계수 계산
+      const confidenceScore = 1 - Math.exp(-matchCount / 100);
+
+      // 최종 점수 계산
+      // 승률(40%) + ELO 변화량(60%) * 신뢰도 계수
+      const finalScore =
+        (winRate * 0.4 + (totalEloPoints / Math.max(1, matchCount)) * 0.6) *
+        confidenceScore;
 
       // 결과 수집
       streamerEloStats.push({
@@ -332,17 +346,20 @@ export class StarCraftGameMatchService {
         wins,
         losses,
         winRate,
+        confidenceScore,
+        finalScore,
       });
     }
 
-    // 총 ELO 포인트 내림차순으로 정렬
-    streamerEloStats.sort((a, b) => b.totalEloPoints - a.totalEloPoints);
+    // 최종 점수 내림차순으로 정렬
+    streamerEloStats.sort((a, b) => b.finalScore - a.finalScore);
 
     return {
       ranking: streamerEloStats,
       startDate: query.startDate,
       endDate: query.endDate,
       genderFilter: query.gender,
+      minMatchCount: query.minMatchCount,
     };
   }
 }

@@ -6,10 +6,10 @@ export class Board {
   @PrimaryGeneratedColumn()
   id: number;
 
-  @Column()
+  @Column({ unique: true })
   name: string; // 게시판 이름
 
-  @Column()
+  @Column({ unique: true })
   slug: string; // URL용 식별자 (예: 'free', 'anonymous', 'incident')
 
   @Column({ default: false })

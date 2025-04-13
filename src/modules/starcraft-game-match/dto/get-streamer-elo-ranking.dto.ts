@@ -1,4 +1,4 @@
-import { IsEnum, IsOptional, IsDateString } from 'class-validator';
+import { IsEnum, IsOptional, IsDateString, IsNumber } from 'class-validator';
 import { StreamerGender } from 'src/entities/types/streamer.type';
 
 export class GetStreamerEloRankingDto {
@@ -13,4 +13,8 @@ export class GetStreamerEloRankingDto {
   @IsOptional()
   @IsEnum(StreamerGender)
   gender?: StreamerGender;
+
+  @IsOptional()
+  @IsNumber()
+  minMatchCount?: number; // 최소 경기 수 필터
 }
