@@ -26,7 +26,7 @@ WORKDIR /app
 
 # 프로덕션 의존성 복사
 COPY package*.json ./
-RUN npm ci --only=production
+RUN npm ci --omit=dev
 
 # 빌드된 파일과 필요한 자산 복사
 COPY --from=builder /app/dist ./dist

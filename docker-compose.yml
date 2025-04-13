@@ -1,12 +1,10 @@
-version: '3.8'
-
 services:
   app:
     build:
       context: .
       dockerfile: Dockerfile
       args:
-        ENVIRONMENT: ${ENVIRONMENT} 
+        ENVIRONMENT: ${ENVIRONMENT}
     container_name: inbang-today-api
     restart: always
     ports:
@@ -25,7 +23,6 @@ services:
       - DISABLE_SSL=${DISABLE_SSL}
     networks:
       - inbang-network
-  
 
   postgres:
     image: postgres:15-alpine
