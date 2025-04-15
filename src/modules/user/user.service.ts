@@ -100,6 +100,27 @@ export class UserService {
     const bucketName = this.configService.get<string>('aws.s3BucketName');
 
     try {
+      // 이전 프로필 이미지가 있으면 S3에서 삭제
+      if (user.profileImage) {
+        try {
+          const cloudFrontDomain = this.configService.get<string>(
+            'aws.cloudFrontDomain',
+          );
+          const oldKey = user.profileImage.replace(
+            `https://${cloudFrontDomain}/`,
+            '',
+          );
+
+          await this.s3Service.deleteS3Object({
+            bucketName,
+            key: oldKey,
+          });
+        } catch (deleteError) {
+          console.error('Failed to delete old profile image:', deleteError);
+          // 이전 이미지 삭제 실패는 새 이미지 업로드에 영향을 주지 않도록 함
+        }
+      }
+
       const imageUrl = await this.s3Service.uploadFile({
         file,
         bucketName,
