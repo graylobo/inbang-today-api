@@ -40,9 +40,13 @@ export class S3Service {
 
     try {
       await this.s3Client.send(new PutObjectCommand(params));
-      return this.configService.get<string>('APP_CDN_URL') + `/${key}`;
+      const cloudFrontDomain = this.configService.get<string>(
+        'aws.cloudFrontDomain',
+      );
+      return `https://${cloudFrontDomain}/${key}`;
     } catch (error) {
       console.error('Error uploading file to S3:', error);
+      throw error;
     }
   }
 

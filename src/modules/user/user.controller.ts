@@ -6,7 +6,13 @@ import {
   Patch,
   Body,
   ForbiddenException,
+  UseInterceptors,
+  UploadedFile,
+  ParseFilePipe,
+  MaxFileSizeValidator,
+  FileTypeValidator,
 } from '@nestjs/common';
+import { FileInterceptor } from '@nestjs/platform-express';
 import { JwtAuthGuard } from 'src/guards/jwt-auth.guard';
 import { CurrentUser } from 'src/modules/auth/decorators/current-user.decorator';
 import { UserService } from 'src/modules/user/user.service';
@@ -114,6 +120,32 @@ export class UserController {
     } catch (error) {
       console.error('Toggle super admin status error:', error);
       throw error;
+    }
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Patch('profile/image')
+  @UseInterceptors(FileInterceptor('image'))
+  async uploadProfileImage(
+    @CurrentUser() user: any,
+    @UploadedFile(
+      new ParseFilePipe({
+        validators: [
+          new MaxFileSizeValidator({ maxSize: 5 * 1024 * 1024 }), // 5MB
+          new FileTypeValidator({ fileType: /(jpg|jpeg|png)$/ }),
+        ],
+      }),
+    )
+    file: Express.Multer.File,
+  ) {
+    try {
+      return await this.userService.updateProfileImage(user.userId, file);
+    } catch (error) {
+      console.error('Upload profile image error:', error);
+      return {
+        success: false,
+        message: error.message,
+      };
     }
   }
 }

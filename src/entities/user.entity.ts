@@ -25,6 +25,9 @@ export class User extends BaseEntity {
   @Column({ default: false })
   isSuperAdmin: boolean;
 
+  @Column({ nullable: true })
+  profileImage: string;
+
   @OneToMany(() => UserCrewPermission, (permission) => permission.user)
   crewPermissions: UserCrewPermission[];
 }

@@ -11,6 +11,11 @@ export type RedisConfig = {
   port: number;
 };
 
+export type AwsConfig = {
+  s3BucketName: string;
+  cloudFrontDomain: string;
+};
+
 export type Configuration = {
   database: DatabaseConfig;
   redis: RedisConfig;
@@ -18,6 +23,7 @@ export type Configuration = {
     secret: string;
     expiresIn: string;
   };
+  aws: AwsConfig;
 };
 
 export default (): Configuration => {
@@ -36,6 +42,11 @@ export default (): Configuration => {
     jwt: {
       secret: process.env.JWT_SECRET || 'secret',
       expiresIn: process.env.JWT_EXPIRES_IN || '1d',
+    },
+    aws: {
+      s3BucketName: process.env.AWS_S3_BUCKET_NAME || 'inbang-today',
+      cloudFrontDomain:
+        process.env.AWS_CLOUDFRONT_DOMAIN || 'file.inbangtoday.com',
     },
   };
 };
