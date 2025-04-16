@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
+import { JwtModule } from '@nestjs/jwt';
 import { Board } from '../../entities/board.entity';
 import { Post } from '../../entities/post.entity';
 import { Comment } from '../../entities/comment.entity';
@@ -10,10 +11,23 @@ import { PostController } from './post.controller';
 import { CommentService } from './comment.service';
 import { CommentController } from './comment.controller';
 import { BoardSeedService } from './board.seed';
+import { BoardAuthGuard } from '../../guards/board-auth.guard';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([Board, Post, Comment])],
-  providers: [BoardService, PostService, CommentService, BoardSeedService],
+  imports: [
+    TypeOrmModule.forFeature([Board, Post, Comment]),
+    JwtModule.register({
+      secret: process.env.JWT_SECRET || 'your-secret-key',
+      signOptions: { expiresIn: '1d' },
+    }),
+  ],
+  providers: [
+    BoardService,
+    PostService,
+    CommentService,
+    BoardSeedService,
+    BoardAuthGuard,
+  ],
   controllers: [BoardController, PostController, CommentController],
   exports: [BoardService, PostService, CommentService],
 })

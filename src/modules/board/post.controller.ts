@@ -14,6 +14,7 @@ import {
 import { BoardService } from './board.service';
 import { PostService } from './post.service';
 import { JwtAuthGuard } from 'src/guards/jwt-auth.guard';
+import { BoardAuthGuard } from 'src/guards/board-auth.guard';
 
 @Controller('posts')
 export class PostController {
@@ -33,15 +34,12 @@ export class PostController {
   }
 
   @Post()
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(BoardAuthGuard)
   async create(@Body() postData: any, @Request() req: any) {
     const board = await this.boardService.findById(postData.boardId);
 
-    // 익명 게시판이 아닌 경우 로그인 필요
+    // 익명 게시판이 아닌 경우 작성자 정보 설정
     if (!board.isAnonymous) {
-      if (!req.user) {
-        throw new UnauthorizedException('로그인이 필요합니다.');
-      }
       postData.author = { id: req.user.userId };
     } else {
       // 익명 게시판인 경우 IP 주소 저장
