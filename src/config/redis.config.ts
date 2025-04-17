@@ -10,9 +10,12 @@ export const redisConfig: CacheModuleOptions = {
 
 export const REDIS_LIKE_KEY = {
   POST_LIKES: (postId: number) => `post:${postId}:likes`,
+  POST_DISLIKES: (postId: number) => `post:${postId}:dislikes`,
   COMMENT_LIKES: (commentId: number) => `comment:${commentId}:likes`,
   USER_POST_LIKE: (userId: number, postId: number) =>
     `user:${userId}:post:${postId}:like`,
+  USER_POST_DISLIKE: (userId: number, postId: number) =>
+    `user:${userId}:post:${postId}:dislike`,
   USER_COMMENT_LIKE: (userId: number, commentId: number) =>
     `user:${userId}:comment:${commentId}:like`,
 };

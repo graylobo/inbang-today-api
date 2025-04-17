@@ -340,7 +340,6 @@ export class CrawlerService {
     batchSize: number,
   ): Promise<number> {
     try {
-      console.log(`Processing batch of ${matches.length} matches`);
       const processed = await this.processAndSaveMatches(
         matches,
         batchSize,

@@ -17,13 +17,29 @@ export class LikesController {
 
   @Post('posts/:id/like')
   @UseGuards(OptionalAuthGuard)
-  async togglePostLike(
+  async likePost(
     @Param('id') postId: number,
     @Req() req: AuthenticatedRequest,
   ) {
     const userId = req.user?.id || null;
     const ipAddress = req.ip;
-    return this.likesService.togglePostLike(postId, userId, ipAddress);
+    return this.likesService.togglePostLike(postId, 'like', userId, ipAddress);
+  }
+
+  @Post('posts/:id/dislike')
+  @UseGuards(OptionalAuthGuard)
+  async dislikePost(
+    @Param('id') postId: number,
+    @Req() req: AuthenticatedRequest,
+  ) {
+    const userId = req.user?.id || null;
+    const ipAddress = req.ip;
+    return this.likesService.togglePostLike(
+      postId,
+      'dislike',
+      userId,
+      ipAddress,
+    );
   }
 
   @Post('comments/:id/like')
@@ -39,33 +55,33 @@ export class LikesController {
 
   @Get('posts/:id/count')
   async getPostLikeCount(@Param('id') postId: number) {
-    return this.likesService.getPostLikeCount(postId);
+    return this.likesService.getPostLikeCounts(postId);
   }
 
   @Get('comments/:id/count')
   async getCommentLikeCount(@Param('id') commentId: number) {
-    return this.likesService.getCommentLikeCount(commentId);
+    return this.likesService.getCommentLikeCounts(commentId);
   }
 
   @Get('posts/:id/status')
   @UseGuards(OptionalAuthGuard)
-  async hasUserLikedPost(
+  async getPostLikeStatus(
     @Param('id') postId: number,
     @Req() req: AuthenticatedRequest,
   ) {
     const userId = req.user?.id || null;
     const ipAddress = req.ip;
-    return this.likesService.hasUserLikedPost(postId, userId, ipAddress);
+    return this.likesService.getPostLikeStatus(postId, userId, ipAddress);
   }
 
   @Get('comments/:id/status')
   @UseGuards(OptionalAuthGuard)
-  async hasUserLikedComment(
+  async getCommentLikeStatus(
     @Param('id') commentId: number,
     @Req() req: AuthenticatedRequest,
   ) {
     const userId = req.user?.id || null;
     const ipAddress = req.ip;
-    return this.likesService.hasUserLikedComment(commentId, userId, ipAddress);
+    return this.likesService.getCommentLikeStatus(commentId, userId, ipAddress);
   }
 }
