@@ -5,6 +5,7 @@ import { AppController } from 'src/app.controller';
 import { AppService } from 'src/app.service';
 import { Board } from 'src/entities/board.entity';
 import { Comment } from 'src/entities/comment.entity';
+import { CommentLike } from 'src/entities/comment-like.entity';
 import { CrewSignatureDance } from 'src/entities/crew-signature-dance.entity';
 import { CrewSignature } from 'src/entities/crew-signature.entity';
 import { Post } from 'src/entities/post.entity';
@@ -39,6 +40,9 @@ import { validate } from 'src/config/env.validation';
 import configuration from 'src/config/configuration';
 import { StarCraftGameMatchHistory } from 'src/entities/starcraft-game-match-history.entity';
 import { CategoryModule } from './modules/category/category.module';
+import { PostLike } from 'src/entities/post-like.entity';
+import { LikesModule } from 'src/likes/likes.module';
+import { BullModule } from '@nestjs/bullmq';
 
 @Module({
   imports: [
@@ -88,6 +92,8 @@ import { CategoryModule } from './modules/category/category.module';
         Board,
         Post,
         Comment,
+        CommentLike,
+        PostLike,
         CrewSignatureDance,
         StarCraftGameMatch,
         StarCraftGameMatchHistory,
@@ -97,6 +103,12 @@ import { CategoryModule } from './modules/category/category.module';
       ],
       synchronize: true,
       // logging: true, // SQL 쿼리 로깅 활성화
+    }),
+    BullModule.forRoot({
+      connection: {
+        host: process.env.REDIS_HOST || 'localhost',
+        port: parseInt(process.env.REDIS_PORT, 10) || 6379,
+      },
     }),
     AuthModule,
     CrewModule,
@@ -108,6 +120,7 @@ import { CategoryModule } from './modules/category/category.module';
     CrewSignatureModule,
     UserPermissionModule,
     BoardModule,
+    LikesModule,
     LiveStreamModule,
     StarCraftGameMatchModule,
     EditorModule,
