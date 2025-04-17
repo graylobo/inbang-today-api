@@ -8,6 +8,7 @@ import {
 } from 'typeorm';
 import { Post } from './post.entity';
 import { User } from './user.entity';
+import { CommentLike } from './comment-like.entity';
 
 @Entity()
 export class Comment extends BaseEntity {
@@ -37,4 +38,10 @@ export class Comment extends BaseEntity {
 
   @OneToMany(() => Comment, (comment) => comment.parent)
   replies: Comment[]; // 대댓글 목록
+
+  @OneToMany(() => CommentLike, (like) => like.comment)
+  likes: CommentLike[];
+
+  @Column({ default: 0 })
+  likeCount: number; // 좋아요 수를 캐시하여 성능 최적화
 }

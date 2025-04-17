@@ -9,6 +9,7 @@ import { Board } from './board.entity';
 import { Comment } from './comment.entity';
 import { User } from './user.entity';
 import { BaseEntity } from 'src/entities/base.entity';
+import { PostLike } from './post-like.entity';
 
 @Entity()
 export class Post extends BaseEntity {
@@ -41,4 +42,10 @@ export class Post extends BaseEntity {
 
   @OneToMany(() => Comment, (comment) => comment.post)
   comments: Comment[];
+
+  @OneToMany(() => PostLike, (like) => like.post)
+  likes: PostLike[];
+
+  @Column({ default: 0 })
+  likeCount: number; // 좋아요 수를 캐시하여 성능 최적화
 }
