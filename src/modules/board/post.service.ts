@@ -7,6 +7,11 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Post } from '../../entities/post.entity';
 import * as bcrypt from 'bcrypt';
+import {
+  Order,
+  PaginatedResponse,
+  PaginationQueryDto,
+} from 'src/common/dto/pagination.dto';
 
 @Injectable()
 export class PostService {
@@ -15,11 +20,31 @@ export class PostService {
     private postRepository: Repository<Post>,
   ) {}
 
-  async findAll(boardId: number): Promise<Post[]> {
-    return this.postRepository.find({
+  async findAll(
+    boardId: number,
+    query: PaginationQueryDto,
+  ): Promise<PaginatedResponse<Post>> {
+    const {
+      page = 1,
+      perPage = 3,
+      order = Order.DESC,
+      orderKey = 'createdAt',
+    } = query;
+
+    const [items, total] = await this.postRepository.findAndCount({
       where: { board: { id: boardId } },
       relations: ['author', 'comments'],
-      order: { createdAt: 'DESC' },
+      order: { [orderKey]: order },
+      take: perPage,
+      skip: (page - 1) * perPage,
+    });
+
+    return new PaginatedResponse({
+      items,
+      total,
+      totalPages: Math.ceil(total / perPage),
+      page,
+      perPage,
     });
   }
 

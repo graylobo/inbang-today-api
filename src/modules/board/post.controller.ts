@@ -15,6 +15,7 @@ import { BoardService } from './board.service';
 import { PostService } from './post.service';
 import { JwtAuthGuard } from 'src/guards/jwt-auth.guard';
 import { BoardAuthGuard } from 'src/guards/board-auth.guard';
+import { PaginationQueryDto } from 'src/common/dto/pagination.dto';
 
 @Controller('posts')
 export class PostController {
@@ -24,8 +25,11 @@ export class PostController {
   ) {}
 
   @Get('board/:boardId')
-  async findAll(@Param('boardId') boardId: string) {
-    return this.postService.findAll(+boardId);
+  async findAll(
+    @Param('boardId') boardId: string,
+    @Query() query: PaginationQueryDto,
+  ) {
+    return this.postService.findAll(+boardId, query);
   }
 
   @Get(':id')
