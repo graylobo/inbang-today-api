@@ -11,11 +11,11 @@ import {
   UnauthorizedException,
   UseGuards,
 } from '@nestjs/common';
+import { PaginationQueryDto } from 'src/common/dto/pagination.dto';
+import { BoardAuthGuard } from 'src/guards/board-auth.guard';
+import { JwtAuthGuard } from 'src/guards/jwt-auth.guard';
 import { BoardService } from './board.service';
 import { PostService } from './post.service';
-import { JwtAuthGuard } from 'src/guards/jwt-auth.guard';
-import { BoardAuthGuard } from 'src/guards/board-auth.guard';
-import { PaginationQueryDto } from 'src/common/dto/pagination.dto';
 
 @Controller('posts')
 export class PostController {
@@ -44,11 +44,9 @@ export class PostController {
 
     // 익명 게시판이 아닌 경우 작성자 정보 설정
     if (!board.isAnonymous) {
-      postData.author = { id: req.user.userId };
-    } else {
-      // 익명 게시판인 경우 IP 주소 저장
-      postData.ipAddress = req.ip || req.connection.remoteAddress;
+      postData.authorName = req.user.name;
     }
+    postData.ipAddress = req.ip || req.connection.remoteAddress;
 
     return this.postService.create(postData);
   }

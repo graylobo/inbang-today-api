@@ -122,8 +122,8 @@ export class CrawlerService {
 
       return res;
     } catch (error) {
-      console.error('크롤링 실패:', error);
-      throw new BadRequestException(`크롤링 실패: ${error.message}`);
+      console.error('크롤링 실패1:', error);
+      throw new BadRequestException(`크롤링 실패11: ${error.message}`);
     }
   }
 
@@ -484,7 +484,7 @@ export class CrawlerService {
       this.eventEmitter.emit(STREAM_EVENTS.UPDATE, streams);
       console.log('캐시 업데이트 완료');
     } catch (error) {
-      console.error('크롤링 실패:', error);
+      console.error('크롤링 실패2:', error);
     } finally {
       await this.closeBrowser();
     }
