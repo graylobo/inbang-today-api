@@ -25,6 +25,19 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
     // 디버깅을 위한 로그 추가
     console.log('JWT Payload:', payload);
 
+    // 임시 사용자인 경우 (소셜 로그인 진행 중)
+    if (payload.isTempUser && payload.socialId) {
+      console.log('임시 사용자 토큰:', payload);
+
+      // 임시 토큰에서는 DB 조회 없이 payload 정보를 그대로 반환
+      return {
+        socialId: payload.socialId,
+        email: payload.email,
+        isTempUser: true,
+      };
+    }
+
+    // 일반 사용자인 경우 (DB에서 조회)
     const user = await this.userRepository.findOne({
       where: { id: payload.sub },
     });
@@ -37,6 +50,7 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
 
     return {
       userId: user.id,
+      sub: user.id, // sub 필드 추가 (컨트롤러에서 req.user.sub로 접근)
       name: user.name,
       isAdmin: user.isAdmin,
     };
