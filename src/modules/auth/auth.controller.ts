@@ -2,8 +2,6 @@ import {
   Controller,
   Post,
   Body,
-  HttpException,
-  HttpStatus,
   Get,
   UseGuards,
   Request,
@@ -46,7 +44,8 @@ export class AuthController {
 
   @Get('google/callback')
   async googleCallback(@Query('code') code: string, @Res() res: Response) {
-    const access_token = await this.authService.googleLogin(code);
+    const { access_token, isNewUser } =
+      await this.authService.googleLogin(code);
     const isProduction = this.configService.get('NODE_ENV') === 'production';
 
     res.cookie('access_token', access_token, {
@@ -57,15 +56,34 @@ export class AuthController {
       domain: this.getCookieDomain(),
     });
 
-    res.redirect(
-      `${this.configService.get('CLIENT_URL')}/auth/google/callback`,
-    );
+    // Redirect to the set-nickname page if it's a new user
+    const redirectUrl = isNewUser
+      ? `${this.configService.get('CLIENT_URL')}/auth/set-nickname`
+      : `${this.configService.get('CLIENT_URL')}/auth/google/callback`;
+
+    res.redirect(redirectUrl);
   }
 
   @UseGuards(JwtAuthGuard)
   @Get('me')
   getProfile(@Request() req) {
     return req.user;
+  }
+
+  @Get('verify-nickname')
+  async verifyNickname(@Query('nickname') nickname: string) {
+    const isAvailable = await this.authService.isNicknameAvailable(nickname);
+    return { isAvailable };
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Post('update-nickname')
+  async updateNickname(@Request() req, @Body() data: { name: string }) {
+    const user = await this.authService.updateUserNickname(
+      req.user.sub,
+      data.name,
+    );
+    return { user };
   }
 
   private getCookieDomain(): string | undefined {

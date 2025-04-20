@@ -1,4 +1,8 @@
-import { BadRequestException, Injectable } from '@nestjs/common';
+import {
+  BadRequestException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { InjectRepository } from '@nestjs/typeorm';
 import * as bcrypt from 'bcrypt';
@@ -24,7 +28,8 @@ export class AuthService {
       throw new BadRequestException(ErrorCode.INVALID_USERNAME_OR_PASSWORD);
     }
     if (user && (await bcrypt.compare(password, user.password))) {
-      const { password, ...result } = user;
+      const result = { ...user };
+      delete result.password;
       return result;
     }
     return null;
@@ -43,7 +48,8 @@ export class AuthService {
 
     const token = this.jwtService.sign(payload);
 
-    const { password, ...userInfo } = currentUser;
+    const userInfo = { ...currentUser };
+    delete userInfo.password;
 
     return {
       access_token: token,
@@ -55,10 +61,19 @@ export class AuthService {
     const accessToken = await this.googleClient.getToken(code);
     const userInfo = await this.googleClient.getUserInfo(accessToken);
     let user = await this.userService.findBySocialId(userInfo.socialId);
+    let isNewUser = false;
+
     if (!user) {
       user = await this.userService.create(userInfo);
+      isNewUser = true;
     }
-    return this.generateToken(user);
+
+    const token = this.generateToken(user);
+
+    return {
+      access_token: token,
+      isNewUser,
+    };
   }
 
   async hashPassword(password: string): Promise<string> {
@@ -78,6 +93,38 @@ export class AuthService {
 
     const user = this.userRepository.create(userData);
     return this.userRepository.save(user);
+  }
+
+  async isNicknameAvailable(nickname: string): Promise<boolean> {
+    const existingUser = await this.userRepository.findOne({
+      where: { name: nickname },
+    });
+    return !existingUser;
+  }
+
+  async updateUserNickname(userId: number, nickname: string): Promise<User> {
+    // First check if the nickname is available
+    const isAvailable = await this.isNicknameAvailable(nickname);
+    if (!isAvailable) {
+      throw new BadRequestException(ErrorCode.DUPLICATE_NAME);
+    }
+
+    // Find the user by ID
+    const user = await this.userRepository.findOne({
+      where: { id: userId },
+    });
+
+    if (!user) {
+      throw new NotFoundException(ErrorCode.NOT_FOUND_USER);
+    }
+
+    // Update the nickname
+    user.name = nickname;
+    await this.userRepository.save(user);
+
+    const userInfo = { ...user };
+    delete userInfo.password;
+    return userInfo as User;
   }
 
   private generateToken(user: any) {
