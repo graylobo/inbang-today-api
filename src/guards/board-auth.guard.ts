@@ -5,6 +5,7 @@ import {
   UnauthorizedException,
 } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
+import { ErrorCode } from 'src/common/enums/error-codes.enum';
 import { BoardService } from '../modules/board/board.service';
 
 @Injectable()
@@ -34,7 +35,7 @@ export class BoardAuthGuard implements CanActivate {
     // 익명 게시판이 아닌 경우 JWT 인증 필요
     const authHeader = request.headers.authorization;
     if (!authHeader) {
-      throw new UnauthorizedException('로그인이 필요합니다.');
+      throw new UnauthorizedException(ErrorCode.UNAUTHORIZED);
     }
 
     try {

@@ -43,6 +43,11 @@ import { CategoryModule } from './modules/category/category.module';
 import { PostLike } from 'src/entities/post-like.entity';
 import { LikesModule } from 'src/likes/likes.module';
 import { BullModule } from '@nestjs/bullmq';
+import { PointsModule } from './modules/points/points.module';
+import { UserLevel } from 'src/entities/user-level.entity';
+import { UserBadge } from 'src/entities/user-badge.entity';
+import { Badge } from 'src/entities/badge.entity';
+import { UserActivity } from 'src/entities/user-activity.entity';
 
 @Module({
   imports: [
@@ -100,6 +105,10 @@ import { BullModule } from '@nestjs/bullmq';
         StarCraftMap,
         Category,
         StreamerCategory,
+        UserActivity,
+        UserLevel,
+        UserBadge,
+        Badge,
       ],
       synchronize: true,
       // logging: true, // SQL 쿼리 로깅 활성화
@@ -126,6 +135,7 @@ import { BullModule } from '@nestjs/bullmq';
     EditorModule,
     AwsModule,
     CategoryModule,
+    PointsModule,
   ],
   controllers: [AppController],
   providers: [AppService],
