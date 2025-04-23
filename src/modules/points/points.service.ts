@@ -1,6 +1,6 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { Repository, EntityManager } from 'typeorm';
 import { UserActivity } from '../../entities/user-activity.entity';
 import { UserLevel } from '../../entities/user-level.entity';
 import { UserBadge } from '../../entities/user-badge.entity';
@@ -58,6 +58,33 @@ export class PointsService {
     return activity;
   }
 
+  async recordActivityWithManager(
+    manager: EntityManager,
+    userId: number,
+    activityType: ActivityType,
+    referenceId?: number,
+  ) {
+    const points = ACTIVITY_POINTS[activityType];
+
+    // 활동 기록
+    const activity = manager.create(UserActivity, {
+      user: { id: userId },
+      activityType,
+      points,
+      referenceId,
+      description: `${activityType} 활동으로 ${points}점 획득`,
+    });
+    await manager.save(UserActivity, activity);
+
+    // 포인트 업데이트 및 계급 체크
+    await this.updateUserPointsWithManager(manager, userId, points);
+
+    // 배지 체크
+    await this.checkBadgesWithManager(manager, userId, activityType);
+
+    return activity;
+  }
+
   private async updateUserPoints(userId: number, points: number) {
     let userLevel = await this.userLevelRepository.findOne({
       where: { user: { id: userId } },
@@ -86,6 +113,34 @@ export class PointsService {
     await this.checkRank(userLevel);
 
     await this.userLevelRepository.save(userLevel);
+  }
+
+  private async updateUserPointsWithManager(
+    manager: EntityManager,
+    userId: number,
+    points: number,
+  ) {
+    let userLevel = await manager.findOne(UserLevel, {
+      where: { user: { id: userId } },
+    });
+
+    if (!userLevel) {
+      userLevel = manager.create(UserLevel, {
+        user: { id: userId },
+        rank: Rank.PRIVATE_SECOND_CLASS,
+        rankCategory: RankCategory.SOLDIER,
+        activityPoints: 0,
+        purchasePoints: 0,
+        lastActivityAt: new Date(),
+        lastPointsReductionAt: new Date(),
+        rankHistory: [],
+      });
+    }
+
+    userLevel.lastActivityAt = new Date();
+    userLevel.activityPoints += points;
+    await this.checkRank(userLevel);
+    await manager.save(UserLevel, userLevel);
   }
 
   private async checkRank(userLevel: UserLevel) {
@@ -184,14 +239,13 @@ export class PointsService {
       where: { user: { id: userId } },
     });
 
-    // 해당 활동과 관련된 배지들 조회
-    const potentialBadges = await this.badgeRepository.find({
-      where: {
-        requirements: {
-          activityType,
-        },
-      },
-    });
+    // 해당 활동과 관련된 배지들 조회 (QueryBuilder로 JSONB 내부 값 비교)
+    const potentialBadges = await this.badgeRepository
+      .createQueryBuilder('badge')
+      .where(`badge.requirements->>'activityType' = :activityType`, {
+        activityType,
+      })
+      .getMany();
 
     for (const badge of potentialBadges) {
       const requirements = badge.requirements;
@@ -226,19 +280,85 @@ export class PointsService {
     }
   }
 
+  private async checkBadgesWithManager(
+    manager: EntityManager,
+    userId: number,
+    activityType: ActivityType,
+  ) {
+    const userActivities = await manager.find(UserActivity, {
+      where: { user: { id: userId }, activityType },
+    });
+
+    const activityCount = userActivities.length;
+    const userLevel = await manager.findOne(UserLevel, {
+      where: { user: { id: userId } },
+    });
+
+    const potentialBadges = await manager
+      .createQueryBuilder(Badge, 'badge')
+      .where(`badge.requirements->>'activityType' = :activityType`, {
+        activityType,
+      })
+      .getMany();
+
+    for (const badge of potentialBadges) {
+      const requirements = badge.requirements;
+      const hasBadge = await manager.findOne(UserBadge, {
+        where: {
+          user: { id: userId },
+          badge: { id: badge.id },
+        },
+      });
+
+      if (!hasBadge) {
+        if (
+          (requirements.count && activityCount >= requirements.count) ||
+          (requirements.level &&
+            RANK_ORDER[userLevel.rank] >= requirements.level) ||
+          (requirements.points &&
+            userLevel.activityPoints >= requirements.points)
+        ) {
+          const userBadge = manager.create(UserBadge, {
+            user: { id: userId },
+            badge: { id: badge.id },
+            earnedAt: new Date(),
+            progress: {
+              current: activityCount,
+              target: requirements.count || 0,
+            },
+          });
+          await manager.save(UserBadge, userBadge);
+        }
+      }
+    }
+  }
+
   async getUserPoints(userId: number) {
-    const userLevel = await this.userLevelRepository.findOne({
+    let userLevel = await this.userLevelRepository.findOne({
       where: { user: { id: userId } },
     });
 
     if (!userLevel) {
-      throw new NotFoundException('User level not found');
+      userLevel = this.userLevelRepository.create({
+        user: { id: userId },
+        rank: Rank.PRIVATE_SECOND_CLASS,
+        rankCategory: RankCategory.SOLDIER,
+        activityPoints: 0,
+        purchasePoints: 0,
+        lastActivityAt: new Date(),
+        lastPointsReductionAt: new Date(),
+        rankHistory: [],
+      });
+      await this.userLevelRepository.save(userLevel);
     }
 
     return {
       rank: userLevel.rank,
       rankCategory: userLevel.rankCategory,
-      points: userLevel.activityPoints,
+      activityPoints: userLevel.activityPoints,
+      purchasePoints: userLevel.purchasePoints,
+      lastActivityAt: userLevel.lastActivityAt,
+      lastPointsReductionAt: userLevel.lastPointsReductionAt,
       rankHistory: userLevel.rankHistory,
     };
   }

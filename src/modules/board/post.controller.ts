@@ -16,6 +16,8 @@ import { BoardAuthGuard } from 'src/guards/board-auth.guard';
 import { JwtAuthGuard } from 'src/guards/jwt-auth.guard';
 import { BoardService } from './board.service';
 import { PostService } from './post.service';
+import { CurrentUser } from 'src/modules/auth/decorators/current-user.decorator';
+import { User } from 'src/entities/user.entity';
 
 @Controller('posts')
 export class PostController {
@@ -39,12 +41,17 @@ export class PostController {
 
   @Post()
   @UseGuards(BoardAuthGuard)
-  async create(@Body() postData: any, @Request() req: any) {
+  async create(
+    @Body() postData: any,
+    @Request() req: any,
+    @CurrentUser() user: User,
+  ) {
     const board = await this.boardService.findById(postData.boardId);
 
     // 익명 게시판이 아닌 경우 작성자 정보 설정
     if (!board.isAnonymous) {
       postData.authorName = req.user.name;
+      postData.author = { id: user.id };
     }
     postData.ipAddress = req.ip || req.connection.remoteAddress;
 

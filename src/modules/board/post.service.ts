@@ -4,7 +4,7 @@ import {
   UnauthorizedException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { Repository, DataSource } from 'typeorm';
 import { Post } from '../../entities/post.entity';
 import * as bcrypt from 'bcrypt';
 import {
@@ -12,12 +12,16 @@ import {
   PaginatedResponse,
   PaginationQueryDto,
 } from 'src/common/dto/pagination.dto';
+import { PointsService } from '../points/points.service';
+import { ActivityType } from '../../entities/user-activity.entity';
 
 @Injectable()
 export class PostService {
   constructor(
     @InjectRepository(Post)
     private postRepository: Repository<Post>,
+    private pointsService: PointsService,
+    private dataSource: DataSource,
   ) {}
 
   async findAll(
@@ -72,18 +76,34 @@ export class PostService {
   }
 
   async create(postData: any) {
-    const posts = this.postRepository.create({
-      ...postData,
-      board: { id: postData.boardId },
+    return await this.dataSource.transaction(async (manager) => {
+      const posts = manager.create(Post, {
+        ...postData,
+        board: { id: postData.boardId },
+        author: postData.author,
+      });
+      const post = Array.isArray(posts) ? posts[0] : posts;
+      if (post.password) {
+        post.password = await bcrypt.hash(post.password, 10);
+      }
+      const savedPost = await manager.save(Post, post);
+
+      const postWithAuthor = await manager.findOne(Post, {
+        where: { id: savedPost.id },
+        relations: ['author'],
+      });
+
+      if (postWithAuthor && postWithAuthor.author && postWithAuthor.author.id) {
+        await this.pointsService.recordActivityWithManager(
+          manager,
+          postWithAuthor.author.id,
+          ActivityType.POST_CREATE,
+          postWithAuthor.id,
+        );
+      }
+
+      return savedPost;
     });
-
-    // 익명 게시글인 경우 비밀번호 해시
-    const post = Array.isArray(posts) ? posts[0] : posts;
-    if (post.password) {
-      post.password = await bcrypt.hash(post.password, 10);
-    }
-
-    return this.postRepository.save(post);
   }
 
   async update(id: number, postData: any, password?: string) {

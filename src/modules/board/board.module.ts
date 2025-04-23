@@ -13,6 +13,7 @@ import { CommentController } from './comment.controller';
 import { BoardSeedService } from './board.seed';
 import { BoardAuthGuard } from '../../guards/board-auth.guard';
 import { ConfigModule, ConfigService } from '@nestjs/config';
+import { PointsModule } from '../points/points.module';
 
 @Module({
   imports: [
@@ -25,6 +26,7 @@ import { ConfigModule, ConfigService } from '@nestjs/config';
       }),
       inject: [ConfigService],
     }),
+    PointsModule,
   ],
   providers: [
     BoardService,
