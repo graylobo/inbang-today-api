@@ -30,6 +30,7 @@ export class CrewBroadcastService {
       broadcastDate: broadcastData.broadcastDate,
       description: broadcastData.description,
       submittedBy: { id: broadcastData.submittedById },
+      broadcastDuration: broadcastData.broadcastDuration,
     });
     return this.crewBroadcastRepository.save(broadcast);
   }

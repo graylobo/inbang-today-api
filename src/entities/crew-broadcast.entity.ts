@@ -29,4 +29,7 @@ export class CrewBroadcast extends BaseEntity {
 
   @Column({ type: 'text', nullable: true })
   description: string;
+
+  @Column({ type: 'integer', nullable: true })
+  broadcastDuration: number;
 }

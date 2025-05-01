@@ -137,15 +137,11 @@ export class CrewEarningService {
         totalAmount: Math.floor(Number(broadcast.totalAmount)),
         description: broadcast.description,
         submittedBy: broadcast.submittedBy,
+        broadcastDuration: broadcast.broadcastDuration,
       };
       // 크루 방송 수익으로 총액 덮어쓰기
       dailyData.totalAmount = Math.floor(Number(broadcast.totalAmount));
-      const test = Math.floor(Number(broadcast.totalAmount));
     });
-
-    const res = Array.from(dailyEarnings.values()).sort(
-      (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime(),
-    );
 
     return Array.from(dailyEarnings.values()).sort(
       (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime(),
