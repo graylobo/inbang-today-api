@@ -27,6 +27,8 @@ import { StreamerCategoryService } from 'src/modules/category/streamer-category.
 import { formatDateString } from 'src/utils/format-date-string.utils';
 import { Between, In, Repository, ILike } from 'typeorm';
 import { IsNull } from 'typeorm';
+import { ConfigService } from '@nestjs/config';
+import { Configuration } from 'src/config/configuration';
 
 export interface MatchData {
   date: string;
@@ -58,11 +60,12 @@ export class CrawlerService {
     private readonly redisService: RedisService,
     private readonly eventEmitter: EventEmitter2,
     private readonly httpService: HttpService,
+    private readonly configService: ConfigService<Configuration, true>,
   ) {}
 
   private browser: Browser | null = null;
   private readonly CHUNK_SIZE = 100;
-  private readonly MIN_VIEW_COUNT = 100;
+  private readonly MIN_VIEW_COUNT = 10;
   private readonly LOAD_TIMEOUT = 60000;
   private readonly CACHE_ALL_STREAM_KEY = 'streaming_data';
   private readonly CACHE_FILTERED_STREAM_KEY = 'filtered_streams';
@@ -72,6 +75,7 @@ export class CrawlerService {
   private async initBrowser() {
     if (!this.browser) {
       this.browser = await chromium.launch({
+        headless: true,
         args: ['--no-sandbox', '--disable-setuid-sandbox'],
       });
     }
@@ -99,9 +103,33 @@ export class CrawlerService {
       const browser = await this.initBrowser();
       const page = await browser.newPage();
 
-      await page.goto('https://www.sooplive.co.kr/live/all', {
+      await page.goto(
+        this.configService.get('soop.loginUrl', { infer: true }),
+        {
+          timeout: this.LOAD_TIMEOUT,
+          waitUntil: 'domcontentloaded',
+        },
+      );
+
+      await page.fill(
+        '#uid',
+        this.configService.get('soop.id', { infer: true }),
+        { force: true },
+      );
+      await page.fill(
+        '#password',
+        this.configService.get('soop.pw', { infer: true }),
+        { force: true },
+      );
+
+      await page.click('.btn_login', { force: true });
+
+      await page.waitForSelector('#btnNextTime', { timeout: 10000 });
+      await page.click('#btnNextTime', { force: true });
+
+      await page.goto(this.configService.get('soop.mainUrl', { infer: true }), {
         timeout: this.LOAD_TIMEOUT,
-        waitUntil: 'networkidle',
+        waitUntil: 'domcontentloaded',
       });
 
       await this.loadAllContent(page);
@@ -497,7 +525,9 @@ export class CrawlerService {
   private async loadAllContent(page: any) {
     while (true) {
       try {
+        await page.waitForSelector('li[data-type="cBox"]', { timeout: 10000 });
         const cards = await page.locator('li[data-type="cBox"]').all();
+        console.log('cards.length:::', cards.length);
         if (cards.length === 0) break;
 
         const lastCard = cards[cards.length - 1];

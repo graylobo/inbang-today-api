@@ -23,6 +23,12 @@ export type Configuration = {
     secret: string;
     expiresIn: string;
   };
+  soop: {
+    loginUrl: string;
+    id: string;
+    pw: string;
+    mainUrl: string;
+  };
   aws: AwsConfig;
 };
 
@@ -38,6 +44,12 @@ export default (): Configuration => {
     redis: {
       host: process.env.REDIS_HOST || 'localhost',
       port: parseInt(process.env.REDIS_PORT) || 6379,
+    },
+    soop: {
+      loginUrl: process.env.SOOP_LOGIN_URL,
+      id: process.env.SOOP_LOGIN_ID,
+      pw: process.env.SOOP_LOGIN_PW,
+      mainUrl: process.env.SOOP_MAIN_URL,
     },
     jwt: {
       secret: process.env.JWT_SECRET || 'secret',
