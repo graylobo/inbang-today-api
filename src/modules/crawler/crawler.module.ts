@@ -11,6 +11,7 @@ import { CrawlerController } from 'src/modules/crawler/crawler.controller';
 import { CrawlerService } from 'src/modules/crawler/crawler.service';
 import { RedisModule } from 'src/modules/redis/redis.module';
 import { StreamerCategoryService } from 'src/modules/category/streamer-category.service';
+import { Crew } from 'src/entities/crew.entity';
 
 @Module({
   imports: [
@@ -20,6 +21,7 @@ import { StreamerCategoryService } from 'src/modules/category/streamer-category.
       StarCraftGameMatch,
       Category,
       StreamerCategory,
+      Crew,
     ]),
     RedisModule,
     HttpModule,

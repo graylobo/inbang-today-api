@@ -7,8 +7,11 @@ export class CrawlerController {
   constructor(private readonly crawlerService: CrawlerService) {}
 
   @Get('broadcasts')
-  async getBroadcasts() {
-    return this.crawlerService.getStreamingData();
+  async getBroadcasts(@Query('crewId') crewId?: string) {
+    return this.crawlerService.getStreamingData({
+      useCache: true,
+      crewId: crewId ? parseInt(crewId) : undefined,
+    });
   }
 
   @Get('match-history')

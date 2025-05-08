@@ -29,6 +29,7 @@ import { Between, In, Repository, ILike } from 'typeorm';
 import { IsNull } from 'typeorm';
 import { ConfigService } from '@nestjs/config';
 import { Configuration } from 'src/config/configuration';
+import { Crew } from 'src/entities/crew.entity';
 
 export interface MatchData {
   date: string;
@@ -61,6 +62,8 @@ export class CrawlerService {
     private readonly eventEmitter: EventEmitter2,
     private readonly httpService: HttpService,
     private readonly configService: ConfigService<Configuration, true>,
+    @InjectRepository(Crew)
+    private readonly crewRepository: Repository<Crew>,
   ) {}
 
   private browser: Browser | null = null;
@@ -89,11 +92,20 @@ export class CrawlerService {
     }
   }
 
-  async getStreamingData({ useCache = true }: { useCache?: boolean } = {}) {
+  async getStreamingData({
+    useCache = true,
+    crewId,
+  }: {
+    useCache?: boolean;
+    crewId?: number;
+  } = {}) {
+    // If filtering by crew, use a different cache key
+    const cacheKey = crewId
+      ? `${this.CACHE_ALL_STREAM_KEY}_crew_${crewId}`
+      : this.CACHE_ALL_STREAM_KEY;
+
     if (useCache) {
-      const cachedData = (await this.redisService.get(
-        this.CACHE_ALL_STREAM_KEY,
-      )) as string;
+      const cachedData = (await this.redisService.get(cacheKey)) as string;
       if (cachedData) {
         return JSON.parse(cachedData);
       }
@@ -133,7 +145,12 @@ export class CrawlerService {
       });
 
       await this.loadAllContent(page);
-      const streamInfos = await this.extractAllStreamInfo(page);
+      const allStreamInfos = await this.extractAllStreamInfo(page);
+
+      // Filter streams based on crewId if provided
+      const streamInfos = crewId
+        ? await this.getFilteredStreamingData(allStreamInfos, crewId)
+        : allStreamInfos;
 
       await page.close();
 
@@ -142,8 +159,9 @@ export class CrawlerService {
         totalCount: streamInfos.length,
       };
 
+      // Cache the result with the appropriate key
       await this.redisService.set(
-        this.CACHE_ALL_STREAM_KEY,
+        cacheKey,
         JSON.stringify(res),
         this.CACHE_TTL,
       );
@@ -489,14 +507,17 @@ export class CrawlerService {
   async handleCron() {
     console.log('크롤링 시작:', new Date().toISOString());
     try {
+      // 모든 스트림 데이터를 가져옴
       const streams = await this.getStreamingData({ useCache: false });
       console.log('스트림 데이터 조회 완료:', streams.totalCount);
 
+      // TARGET_STREAMERS 필터링 데이터
       const filteredStreams = await this.getFilteredStreamingData(
         streams.streamInfos,
       );
       console.log('필터링된 스트림 수:', filteredStreams.length);
 
+      // 기본 캐시 저장
       await Promise.all([
         this.redisService.set(
           this.CACHE_ALL_STREAM_KEY,
@@ -509,8 +530,37 @@ export class CrawlerService {
           this.CACHE_TTL,
         ),
       ]);
+
+      // 모든 크루 목록 가져오기
+      const crews = await this.crewRepository.find();
+      console.log(`모든 크루 캐시 업데이트 시작 (${crews.length}개)`);
+
+      // 각 크루별로 필터링된 스트림 데이터를 캐싱
+      for (const crew of crews) {
+        const crewFilteredStreams = await this.getFilteredStreamingData(
+          streams.streamInfos,
+          crew.id,
+        );
+
+        const crewStreamData = {
+          streamInfos: crewFilteredStreams,
+          totalCount: crewFilteredStreams.length,
+        };
+
+        const crewCacheKey = `${this.CACHE_ALL_STREAM_KEY}_crew_${crew.id}`;
+        await this.redisService.set(
+          crewCacheKey,
+          JSON.stringify(crewStreamData),
+          this.CACHE_TTL,
+        );
+
+        console.log(
+          `크루 ${crew.name}(ID: ${crew.id}) 캐시 업데이트 완료: ${crewFilteredStreams.length}개 스트림`,
+        );
+      }
+
       this.eventEmitter.emit(STREAM_EVENTS.UPDATE, streams);
-      console.log('캐시 업데이트 완료');
+      console.log('모든 캐시 업데이트 완료');
     } catch (error) {
       console.error('크롤링 실패2:', error);
     } finally {
@@ -646,10 +696,37 @@ export class CrawlerService {
     return url;
   }
 
-  private async getFilteredStreamingData(streams): Promise<StreamInfo[]> {
-    return streams.filter((stream) =>
-      TARGET_STREAMERS.includes(stream.profileUrl.split('/').pop() || ''),
-    );
+  private async getFilteredStreamingData(
+    streams,
+    crewId?: number,
+  ): Promise<StreamInfo[]> {
+    if (!crewId) {
+      // If no crewId is provided, use the original TARGET_STREAMERS list
+      return streams.filter((stream) =>
+        TARGET_STREAMERS.includes(stream.profileUrl.split('/').pop() || ''),
+      );
+    }
+
+    // Get all streamers from the specified crew
+    const crew = await this.crewRepository.findOne({
+      where: { id: crewId },
+      relations: ['members'],
+    });
+
+    if (!crew) {
+      return [];
+    }
+
+    // Extract soopIds from crew members
+    const crewSoopIds = crew.members
+      .filter((member) => member.soopId)
+      .map((member) => member.soopId);
+
+    // Filter streams based on crew soopIds
+    return streams.filter((stream) => {
+      const streamerId = stream.profileUrl.split('/').pop() || '';
+      return crewSoopIds.includes(streamerId);
+    });
   }
 
   private parseStreamerNameAndRace(fullName: string): {
