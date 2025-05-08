@@ -526,16 +526,15 @@ export class CrawlerService {
     while (true) {
       try {
         await page.waitForSelector('li[data-type="cBox"]', { timeout: 10000 });
-        const cards = await page.locator('li[data-type="cBox"]').all();
-        console.log('cards.length:::', cards.length);
-        if (cards.length === 0) break;
+        const streamers = await page.locator('li[data-type="cBox"]').all();
+        if (streamers.length === 0) break;
 
-        const lastCard = cards[cards.length - 1];
-        const viewCountText = await lastCard
+        const lastStreamer = streamers[streamers.length - 1];
+        let viewCount = await lastStreamer
           .locator('[data-testid="view-count"]')
           .textContent();
 
-        const viewCount = this.parseViewCount(viewCountText);
+        viewCount = this.parseViewCount(viewCount);
         if (viewCount < this.MIN_VIEW_COUNT) break;
 
         const showMoreButton = await page.locator('.show_more button').first();
