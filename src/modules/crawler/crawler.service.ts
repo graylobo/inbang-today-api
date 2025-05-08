@@ -1,11 +1,15 @@
 import { HttpService } from '@nestjs/axios';
 import { BadRequestException, Injectable } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { Cron, CronExpression } from '@nestjs/schedule';
 import { InjectRepository } from '@nestjs/typeorm';
 import * as cheerio from 'cheerio';
 import { Browser, chromium } from 'playwright';
 import { firstValueFrom } from 'rxjs';
+import { Configuration } from 'src/config/configuration';
+import { Category } from 'src/entities/category.entity';
+import { Crew } from 'src/entities/crew.entity';
 import { StarCraftGameMatchHistory } from 'src/entities/starcraft-game-match-history.entity';
 import {
   MatchOrigin,
@@ -13,23 +17,18 @@ import {
 } from 'src/entities/starcraft-game-match.entity';
 import { StarCraftMap } from 'src/entities/starcraft-map.entity';
 import { Streamer } from 'src/entities/streamer.entity';
-import { Category } from 'src/entities/category.entity';
 import {
   StarCraftRace,
   StreamerGender,
 } from 'src/entities/types/streamer.type';
 import { STREAM_EVENTS } from 'src/events/stream.events';
+import { StreamerCategoryService } from 'src/modules/category/streamer-category.service';
 import { GetSaveMatchDataDto } from 'src/modules/crawler/dto/request/get-save-match-data.dto';
 import { TARGET_STREAMERS } from 'src/modules/crawler/metadata';
 import { StreamInfo } from 'src/modules/crawler/type';
 import { RedisService } from 'src/modules/redis/redis.service';
-import { StreamerCategoryService } from 'src/modules/category/streamer-category.service';
 import { formatDateString } from 'src/utils/format-date-string.utils';
-import { Between, In, Repository, ILike } from 'typeorm';
-import { IsNull } from 'typeorm';
-import { ConfigService } from '@nestjs/config';
-import { Configuration } from 'src/config/configuration';
-import { Crew } from 'src/entities/crew.entity';
+import { Between, ILike, In, IsNull, Repository } from 'typeorm';
 
 export interface MatchData {
   date: string;
@@ -1119,8 +1118,6 @@ export class CrawlerService {
             { id: streamer.id },
             {
               soopId,
-              broadcastUrl: `https://ch.sooplive.co.kr/${soopId}`,
-              profileImageUrl: `https://profile.img.sooplive.co.kr/LOGO/${soopId.slice(0, 2)}/${soopId}/${soopId}.jpg`,
             },
           );
           console.log(

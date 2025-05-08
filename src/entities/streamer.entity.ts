@@ -31,12 +31,6 @@ export class Streamer {
   @Column({ nullable: true })
   eloBoardId: string;
 
-  @Column({ nullable: true })
-  profileImageUrl: string;
-
-  @Column({ nullable: true })
-  broadcastUrl: string;
-
   @Column({
     type: 'enum',
     enum: StarCraftRace,

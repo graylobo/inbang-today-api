@@ -136,8 +136,7 @@ export class StreamerService {
 
     const member = this.streamerRepository.create({
       name: memberData.name,
-      profileImageUrl: memberData.profileImageUrl,
-      broadcastUrl: memberData.broadcastUrl,
+      soopId: memberData.soopId,
       crew: { id: memberData.crewId },
       rank: { id: memberData.rankId },
     });
@@ -166,15 +165,11 @@ export class StreamerService {
 
     // 기본 정보 업데이트
     if (memberData.name) member.name = memberData.name;
-    if (memberData.profileImageUrl !== undefined)
-      member.profileImageUrl = memberData.profileImageUrl;
-    if (memberData.broadcastUrl !== undefined)
-      member.broadcastUrl = memberData.broadcastUrl;
+    if (memberData.soopId !== undefined) member.soopId = memberData.soopId;
     if (memberData.crewId) member.crew = { id: memberData.crewId } as any;
     if (memberData.rankId) member.rank = { id: memberData.rankId } as any;
     if (memberData.nickname !== undefined)
       member.nickname = memberData.nickname;
-    if (memberData.soopId !== undefined) member.soopId = memberData.soopId;
     if (memberData.race !== undefined) member.race = memberData.race;
     if (memberData.tier !== undefined) member.tier = memberData.tier;
 
