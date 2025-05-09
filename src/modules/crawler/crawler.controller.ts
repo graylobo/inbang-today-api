@@ -7,7 +7,24 @@ export class CrawlerController {
   constructor(private readonly crawlerService: CrawlerService) {}
 
   @Get('broadcasts')
-  async getBroadcasts(@Query('crewId') crewId?: string) {
+  async getBroadcasts(
+    @Query('crewId') crewId?: string,
+    @Query('streamerIds') streamerIds?: string,
+  ) {
+    // 스트리머 ID가 제공된 경우 처리
+    if (streamerIds) {
+      const streamerIdArray = streamerIds
+        .split(',')
+        .filter((id) => id.trim() !== '');
+      if (streamerIdArray.length > 0) {
+        return this.crawlerService.getStreamingData({
+          crewId: crewId ? parseInt(crewId) : undefined,
+          streamerIds: streamerIdArray,
+        });
+      }
+    }
+
+    // 기존 크루 ID 기반 처리
     return this.crawlerService.getStreamingData({
       crewId: crewId ? parseInt(crewId) : undefined,
     });

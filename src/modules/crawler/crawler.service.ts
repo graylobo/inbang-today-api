@@ -71,7 +71,7 @@ export class CrawlerService {
   private readonly LOAD_TIMEOUT = 60000;
   private readonly CACHE_ALL_STREAM_KEY = 'streaming_data';
   private readonly CACHE_FILTERED_STREAM_KEY = 'filtered_streams';
-  private readonly CACHE_TTL = 70;
+  private readonly CACHE_TTL = 0;
 
   // 크롤링 중복 실행 방지용 플래그
   private isCronJobRunning = false;
@@ -96,8 +96,10 @@ export class CrawlerService {
 
   async getStreamingData({
     crewId,
+    streamerIds,
   }: {
     crewId?: number;
+    streamerIds?: string[];
   } = {}) {
     // If filtering by crew, use a different cache key
     const cacheKey = crewId
@@ -107,22 +109,49 @@ export class CrawlerService {
     // 캐시된 데이터 반환 (항상 캐시만 사용)
     const cachedData = (await this.redisService.get(cacheKey)) as string;
     if (cachedData) {
+      // streamerIds가 제공된 경우 추가 필터링
+      if (streamerIds && streamerIds.length > 0) {
+        const data = JSON.parse(cachedData);
+        const filteredStreams = data.streamInfos.filter((stream) => {
+          // 프로필 URL에서 스트리머 ID 추출 (마지막 부분)
+          const streamerId = stream.profileUrl.split('/').pop() || '';
+          return streamerIds.includes(streamerId);
+        });
+
+        return {
+          streamInfos: filteredStreams,
+          totalCount: filteredStreams.length,
+        };
+      }
+
       return JSON.parse(cachedData);
     }
 
     // 캐시가 없는 경우, 빈 결과 대신 기본 전체 캐시 확인
-    if (crewId) {
+    if (crewId || (streamerIds && streamerIds.length > 0)) {
       const globalCachedData = (await this.redisService.get(
         this.CACHE_ALL_STREAM_KEY,
       )) as string;
 
       if (globalCachedData) {
         const allData = JSON.parse(globalCachedData);
-        // 전체 스트림 중에서 현재 크루에 해당하는 스트림만 필터링
-        const filteredStreams = await this.getFilteredStreamingData(
-          allData.streamInfos,
-          crewId,
-        );
+        let filteredStreams = allData.streamInfos;
+
+        // 크루 ID로 필터링
+        if (crewId) {
+          filteredStreams = await this.getFilteredStreamingData(
+            filteredStreams,
+            crewId,
+          );
+        }
+
+        // 스트리머 ID로 추가 필터링
+        if (streamerIds && streamerIds.length > 0) {
+          filteredStreams = filteredStreams.filter((stream) => {
+            const streamerId = stream.profileUrl.split('/').pop() || '';
+            return streamerIds.includes(streamerId);
+          });
+        }
 
         return {
           streamInfos: filteredStreams,
