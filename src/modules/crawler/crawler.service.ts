@@ -71,11 +71,11 @@ export class CrawlerService {
   private readonly LOAD_TIMEOUT = 60000;
   private readonly CACHE_ALL_STREAM_KEY = 'streaming_data';
   private readonly CACHE_FILTERED_STREAM_KEY = 'filtered_streams';
-
   private readonly CACHE_TTL = 70;
 
-  // Add a lock flag to prevent overlapping cron executions
+  // 크롤링 중복 실행 방지용 플래그
   private isCronJobRunning = false;
+  private isCrawlingLock = false;
 
   private async initBrowser() {
     if (!this.browser) {
@@ -95,10 +95,8 @@ export class CrawlerService {
   }
 
   async getStreamingData({
-    useCache = true,
     crewId,
   }: {
-    useCache?: boolean;
     crewId?: number;
   } = {}) {
     // If filtering by crew, use a different cache key
@@ -106,73 +104,36 @@ export class CrawlerService {
       ? `${this.CACHE_ALL_STREAM_KEY}_crew_${crewId}`
       : this.CACHE_ALL_STREAM_KEY;
 
-    if (useCache) {
-      const cachedData = (await this.redisService.get(cacheKey)) as string;
-      if (cachedData) {
-        return JSON.parse(cachedData);
+    // 캐시된 데이터 반환 (항상 캐시만 사용)
+    const cachedData = (await this.redisService.get(cacheKey)) as string;
+    if (cachedData) {
+      return JSON.parse(cachedData);
+    }
+
+    // 캐시가 없는 경우, 빈 결과 대신 기본 전체 캐시 확인
+    if (crewId) {
+      const globalCachedData = (await this.redisService.get(
+        this.CACHE_ALL_STREAM_KEY,
+      )) as string;
+
+      if (globalCachedData) {
+        const allData = JSON.parse(globalCachedData);
+        // 전체 스트림 중에서 현재 크루에 해당하는 스트림만 필터링
+        const filteredStreams = await this.getFilteredStreamingData(
+          allData.streamInfos,
+          crewId,
+        );
+
+        return {
+          streamInfos: filteredStreams,
+          totalCount: filteredStreams.length,
+        };
       }
     }
 
-    try {
-      const browser = await this.initBrowser();
-      const page = await browser.newPage();
-
-      await page.goto(
-        this.configService.get('soop.loginUrl', { infer: true }),
-        {
-          timeout: this.LOAD_TIMEOUT,
-          waitUntil: 'domcontentloaded',
-        },
-      );
-
-      await page.fill(
-        '#uid',
-        this.configService.get('soop.id', { infer: true }),
-        { force: true },
-      );
-      await page.fill(
-        '#password',
-        this.configService.get('soop.pw', { infer: true }),
-        { force: true },
-      );
-
-      await page.click('.btn_login', { force: true });
-
-      await page.waitForSelector('#btnNextTime', { timeout: 10000 });
-      await page.click('#btnNextTime', { force: true });
-
-      await page.goto(this.configService.get('soop.mainUrl', { infer: true }), {
-        timeout: this.LOAD_TIMEOUT,
-        waitUntil: 'domcontentloaded',
-      });
-
-      await this.loadAllContent(page);
-      const allStreamInfos = await this.extractAllStreamInfo(page);
-
-      // Filter streams based on crewId if provided
-      const streamInfos = crewId
-        ? await this.getFilteredStreamingData(allStreamInfos, crewId)
-        : allStreamInfos;
-
-      await page.close();
-
-      const res = {
-        streamInfos,
-        totalCount: streamInfos.length,
-      };
-
-      // Cache the result with the appropriate key
-      await this.redisService.set(
-        cacheKey,
-        JSON.stringify(res),
-        this.CACHE_TTL,
-      );
-
-      return res;
-    } catch (error) {
-      console.error('크롤링 실패1:', error);
-      throw new BadRequestException(`크롤링 실패11: ${error.message}`);
-    }
+    // 캐시도 없고 cron job도 아닌 경우 빈 결과 반환
+    console.log('캐시된 데이터가 없습니다');
+    return { streamInfos: [], totalCount: 0 };
   }
 
   async getMatchHistory(startDate: string, endDate: string) {
@@ -519,8 +480,8 @@ export class CrawlerService {
     console.log('크롤링 시작:', new Date().toISOString());
 
     try {
-      // 모든 스트림 데이터를 가져옴
-      const streams = await this.getStreamingData({ useCache: false });
+      // 모든 스트림 데이터를 크롤링으로 가져옴
+      const streams = await this.performCrawling(this.CACHE_ALL_STREAM_KEY);
       console.log('스트림 데이터 조회 완료:', streams.totalCount);
 
       // TARGET_STREAMERS 필터링 데이터
@@ -529,19 +490,15 @@ export class CrawlerService {
       );
       console.log('필터링된 스트림 수:', filteredStreams.length);
 
-      // 기본 캐시 저장
-      await Promise.all([
-        this.redisService.set(
-          this.CACHE_ALL_STREAM_KEY,
-          JSON.stringify(streams),
-          this.CACHE_TTL,
-        ),
-        this.redisService.set(
-          this.CACHE_FILTERED_STREAM_KEY,
-          JSON.stringify(filteredStreams),
-          this.CACHE_TTL,
-        ),
-      ]);
+      // 필터링된 데이터 캐시 저장
+      await this.redisService.set(
+        this.CACHE_FILTERED_STREAM_KEY,
+        JSON.stringify({
+          streamInfos: filteredStreams,
+          totalCount: filteredStreams.length,
+        }),
+        this.CACHE_TTL,
+      );
 
       // 모든 크루 목록 가져오기
       const crews = await this.crewRepository.find();
@@ -574,7 +531,7 @@ export class CrawlerService {
       this.eventEmitter.emit(STREAM_EVENTS.UPDATE, streams);
       console.log('모든 캐시 업데이트 완료');
     } catch (error) {
-      console.error('크롤링 실패2:', error);
+      console.error('크롤링 실패:', error);
     } finally {
       await this.closeBrowser();
       // Release the lock when the job completes
@@ -1179,5 +1136,71 @@ export class CrawlerService {
 
     // 모든 콘텐츠가 로드될 시간을 추가로 부여
     await page.waitForTimeout(3000);
+  }
+
+  // 락을 사용하지 않는 기본 크롤링 메서드 추가
+  private async performCrawling(cacheKey: string, crewId?: number) {
+    try {
+      const browser = await this.initBrowser();
+      const page = await browser.newPage();
+
+      await page.goto(
+        this.configService.get('soop.loginUrl', { infer: true }),
+        {
+          timeout: this.LOAD_TIMEOUT,
+          waitUntil: 'domcontentloaded',
+        },
+      );
+
+      await page.fill(
+        '#uid',
+        this.configService.get('soop.id', { infer: true }),
+        { force: true },
+      );
+      await page.fill(
+        '#password',
+        this.configService.get('soop.pw', { infer: true }),
+        { force: true },
+      );
+
+      await page.click('.btn_login', { force: true });
+
+      await page.waitForSelector('#btnNextTime', { timeout: 10000 });
+      await page.click('#btnNextTime', { force: true });
+
+      await page.goto(this.configService.get('soop.mainUrl', { infer: true }), {
+        timeout: this.LOAD_TIMEOUT,
+        waitUntil: 'domcontentloaded',
+      });
+
+      await this.loadAllContent(page);
+      const allStreamInfos = await this.extractAllStreamInfo(page);
+
+      // Filter streams based on crewId if provided
+      const streamInfos = crewId
+        ? await this.getFilteredStreamingData(allStreamInfos, crewId)
+        : allStreamInfos;
+
+      await page.close();
+
+      const res = {
+        streamInfos,
+        totalCount: streamInfos.length,
+      };
+
+      // 캐시 저장
+      await this.redisService.set(
+        cacheKey,
+        JSON.stringify(res),
+        this.CACHE_TTL,
+      );
+
+      return res;
+    } catch (error) {
+      console.error('크롤링 실패:', error);
+      throw new BadRequestException(`크롤링 실패: ${error.message}`);
+    } finally {
+      await this.closeBrowser();
+    }
   }
 }

@@ -9,7 +9,6 @@ export class CrawlerController {
   @Get('broadcasts')
   async getBroadcasts(@Query('crewId') crewId?: string) {
     return this.crawlerService.getStreamingData({
-      useCache: true,
       crewId: crewId ? parseInt(crewId) : undefined,
     });
   }
