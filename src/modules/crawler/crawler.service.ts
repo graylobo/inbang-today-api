@@ -67,12 +67,15 @@ export class CrawlerService {
 
   private browser: Browser | null = null;
   private readonly CHUNK_SIZE = 100;
-  private readonly MIN_VIEW_COUNT = 10;
+  private readonly MIN_VIEW_COUNT = 0;
   private readonly LOAD_TIMEOUT = 60000;
   private readonly CACHE_ALL_STREAM_KEY = 'streaming_data';
   private readonly CACHE_FILTERED_STREAM_KEY = 'filtered_streams';
 
   private readonly CACHE_TTL = 70;
+
+  // Add a lock flag to prevent overlapping cron executions
+  private isCronJobRunning = false;
 
   private async initBrowser() {
     if (!this.browser) {
@@ -504,7 +507,17 @@ export class CrawlerService {
   }
   @Cron(CronExpression.EVERY_MINUTE)
   async handleCron() {
+    // Skip if previous execution is still running
+    if (this.isCronJobRunning) {
+      console.log(
+        'Previous cron job is still running, skipping this execution',
+      );
+      return;
+    }
+
+    this.isCronJobRunning = true;
     console.log('크롤링 시작:', new Date().toISOString());
+
     try {
       // 모든 스트림 데이터를 가져옴
       const streams = await this.getStreamingData({ useCache: false });
@@ -564,6 +577,9 @@ export class CrawlerService {
       console.error('크롤링 실패2:', error);
     } finally {
       await this.closeBrowser();
+      // Release the lock when the job completes
+      this.isCronJobRunning = false;
+      console.log('크롤링 종료:', new Date().toISOString());
     }
   }
 
@@ -576,6 +592,7 @@ export class CrawlerService {
       try {
         await page.waitForSelector('li[data-type="cBox"]', { timeout: 10000 });
         const streamers = await page.locator('li[data-type="cBox"]').all();
+        console.log('streamers:::', streamers.length);
         if (streamers.length === 0) break;
 
         const lastStreamer = streamers[streamers.length - 1];
