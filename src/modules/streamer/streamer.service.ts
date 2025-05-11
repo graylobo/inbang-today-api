@@ -10,12 +10,15 @@ import { Streamer } from '../../entities/streamer.entity';
 import { ErrorCode } from 'src/common/enums/error-codes.enum';
 import { StreamerCategoryService } from '../category/streamer-category.service';
 import { In } from 'typeorm';
+import { CrewRank } from '../../entities/crew-rank.entity';
 
 @Injectable()
 export class StreamerService {
   constructor(
     @InjectRepository(Streamer)
     private streamerRepository: Repository<Streamer>,
+    @InjectRepository(CrewRank)
+    private crewRankRepository: Repository<CrewRank>,
     private streamerCategoryService: StreamerCategoryService,
   ) {}
 
@@ -232,5 +235,55 @@ export class StreamerService {
         rank: { level: 'ASC' },
       },
     });
+  }
+
+  async createBulk(
+    membersData: (Partial<Streamer> & {
+      categoryIds?: number[];
+      rankName?: string;
+      crewId?: number;
+      rankId?: number;
+    })[],
+  ): Promise<Streamer[]> {
+    const results = [];
+
+    // 모든 크루 랭크를 미리 불러와서 캐싱 (N+1 쿼리 방지)
+    const allRanks = await this.crewRankRepository.find({
+      relations: ['crew'],
+    });
+
+    for (const memberData of membersData) {
+      try {
+        // rankName이 있으면 그에 해당하는 rankId 찾기
+        if (memberData.rankName && memberData.crewId) {
+          const rank = allRanks.find(
+            (r) =>
+              r.name === memberData.rankName && r.crew.id === memberData.crewId,
+          );
+
+          if (rank) {
+            memberData.rankId = rank.id;
+          } else {
+            console.warn(
+              `Rank with name "${memberData.rankName}" and crewId ${memberData.crewId} not found. Using provided rankId if available.`,
+            );
+          }
+        }
+
+        // rankName 속성 제거 (실제 엔티티 필드가 아님)
+        // eslint-disable-next-line @typescript-eslint/no-unused-vars
+        const { rankName, ...cleanedData } = memberData;
+
+        const streamer = await this.create(cleanedData);
+        results.push(streamer);
+      } catch (error) {
+        console.error(
+          `Failed to create streamer ${memberData.name}: ${error.message}`,
+        );
+        // 에러가 발생해도 계속 진행 (필요에 따라 조정 가능)
+      }
+    }
+
+    return results;
   }
 }
