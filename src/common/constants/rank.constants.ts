@@ -97,18 +97,6 @@ export const RANK_DEMOTION = {
   MINIMUM_POINTS: 0, // 최소 포인트
 };
 
-export const ACTIVITY_POINTS: Record<ActivityType, number> = {
-  [ActivityType.POST_CREATE]: 10,
-  [ActivityType.POST_LIKE]: 1,
-  [ActivityType.COMMENT_CREATE]: 5,
-  [ActivityType.COMMENT_LIKE]: 1,
-  [ActivityType.DAILY_LOGIN]: 5,
-  [ActivityType.PROFILE_COMPLETE]: 10,
-  [ActivityType.POST_SHARE]: 1,
-  [ActivityType.COMMENT_REPLY]: 5,
-  [ActivityType.POST_VIEW]: 1,
-};
-
 export const RANK_ORDER: Record<Rank, number> = {
   [Rank.PRIVATE_SECOND_CLASS]: 0,
   [Rank.PRIVATE_FIRST_CLASS]: 1,

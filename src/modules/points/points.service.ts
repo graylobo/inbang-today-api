@@ -8,7 +8,6 @@ import { Badge } from '../../entities/badge.entity';
 import { User } from '../../entities/user.entity';
 import { ActivityType } from '../../entities/user-activity.entity';
 import {
-  ACTIVITY_POINTS,
   RANK_POINTS,
   RANK_CATEGORIES,
   RANK_DEMOTION,
@@ -16,6 +15,7 @@ import {
   Rank,
   RankCategory,
 } from '../../common/constants/rank.constants';
+import { ACTIVITY_POINTS } from 'src/common/constants/points.constants';
 
 @Injectable()
 export class PointsService {

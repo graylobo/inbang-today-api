@@ -12,6 +12,7 @@ export enum ActivityType {
   POST_SHARE = 'POST_SHARE',
   COMMENT_REPLY = 'COMMENT_REPLY',
   POST_VIEW = 'POST_VIEW',
+  BROADCAST_EARNING = 'BROADCAST_EARNING',
 }
 
 @Entity()
