@@ -27,9 +27,17 @@ export class LiveStreamGateway
     console.log(`Client disconnected: ${client.id}`);
   }
 
+  // 전체 스트리머 방출
   @SubscribeMessage('updateLiveStreamers')
   @OnEvent(STREAM_EVENTS.UPDATE)
   updateClients(data: any[]): void {
     this.server.emit('updateLiveStreamers', data);
+  }
+
+  // 스트리머 업데이트 알림 
+  @SubscribeMessage('liveStreamersUpdated')
+  @OnEvent(STREAM_EVENTS.UPDATE)
+  liveStreamersUpdated(): void {
+    this.server.emit('liveStreamersUpdated');
   }
 }
