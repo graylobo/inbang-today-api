@@ -7,6 +7,7 @@ import { UserBadge } from '../../entities/user-badge.entity';
 import { Badge } from '../../entities/badge.entity';
 import { User } from '../../entities/user.entity';
 import { ActivityType } from '../../entities/user-activity.entity';
+import { PurchasePointHistory } from '../../entities/purchase-point-history.entity';
 import {
   RANK_POINTS,
   RANK_CATEGORIES,
@@ -30,6 +31,8 @@ export class PointsService {
     private badgeRepository: Repository<Badge>,
     @InjectRepository(User)
     private userRepository: Repository<User>,
+    @InjectRepository(PurchasePointHistory)
+    private purchasePointHistoryRepository: Repository<PurchasePointHistory>,
   ) {}
 
   async recordActivity(
@@ -416,7 +419,12 @@ export class PointsService {
   }
 
   // 구매 포인트 관련 메서드 추가
-  async addPurchasePoints(userId: number, points: number) {
+  async addPurchasePoints(
+    userId: number,
+    points: number,
+    referenceId?: number,
+    description?: string,
+  ) {
     const userLevel = await this.userLevelRepository.findOne({
       where: { user: { id: userId } },
     });
@@ -427,6 +435,43 @@ export class PointsService {
 
     userLevel.purchasePoints += points;
     await this.userLevelRepository.save(userLevel);
+
+    // 구매포인트 지급 내역 기록
+    const history = this.purchasePointHistoryRepository.create({
+      user: { id: userId },
+      points,
+      referenceId,
+      description: description || `구매포인트 ${points}점 지급`,
+    });
+    await this.purchasePointHistoryRepository.save(history);
+  }
+
+  async addPurchasePointsWithManager(
+    manager: EntityManager,
+    userId: number,
+    points: number,
+    referenceId?: number,
+    description?: string,
+  ) {
+    const userLevel = await manager.findOne(UserLevel, {
+      where: { user: { id: userId } },
+    });
+
+    if (!userLevel) {
+      throw new Error('User level not found');
+    }
+
+    userLevel.purchasePoints += points;
+    await manager.save(UserLevel, userLevel);
+
+    // 구매포인트 지급 내역 기록
+    const history = manager.create(PurchasePointHistory, {
+      user: { id: userId },
+      points,
+      referenceId,
+      description: description || `구매포인트 ${points}점 지급`,
+    });
+    await manager.save(PurchasePointHistory, history);
   }
 
   async usePurchasePoints(userId: number, points: number) {

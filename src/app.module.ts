@@ -48,6 +48,7 @@ import { UserLevel } from 'src/entities/user-level.entity';
 import { UserBadge } from 'src/entities/user-badge.entity';
 import { Badge } from 'src/entities/badge.entity';
 import { UserActivity } from 'src/entities/user-activity.entity';
+import { PurchasePointHistory } from 'src/entities/purchase-point-history.entity';
 
 @Module({
   imports: [
@@ -109,6 +110,7 @@ import { UserActivity } from 'src/entities/user-activity.entity';
         UserLevel,
         UserBadge,
         Badge,
+        PurchasePointHistory,
       ],
       synchronize: true,
       // logging: true, // SQL 쿼리 로깅 활성화
