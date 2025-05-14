@@ -590,10 +590,36 @@ export class CrawlerService {
         if (viewCount < this.MIN_VIEW_COUNT) break;
 
         const showMoreButton = await page.locator('.show_more button').first();
-        if (!(await showMoreButton.isVisible())) break;
+        if (!(await showMoreButton.isVisible())) {
+          console.log('더보기 버튼이 존재하지 않음');
+          break;
+        }
 
+        const currentCount = streamers.length;
         await showMoreButton.click();
         await page.waitForLoadState('networkidle');
+
+        // 새로운 스트리머가 로드될 때까지 대기 (elements.length가  expectedCount 보다 커질때까지 5초동안 대기)
+        try {
+          await page.waitForFunction(
+            (expectedCount) => {
+              const elements = document.querySelectorAll(
+                'li[data-type="cBox"]',
+              );
+              return elements.length > expectedCount;
+            },
+            currentCount,
+            { timeout: 5000 },
+          );
+        } catch (timeoutError) {
+          console.log('새로운 스트리머가 로드되지 않음');
+          // 여러 번 시도해도 변화가 없으면 종료
+          const newStreamers = await page.locator('li[data-type="cBox"]').all();
+          if (newStreamers.length <= currentCount) {
+            console.log('스트리머 수 증가 없음, 크롤링 종료');
+            break;
+          }
+        }
       } catch (error) {
         console.error('컨텐츠 로딩 중 에러:', error);
         break;
