@@ -2,6 +2,7 @@ import {
   Injectable,
   NotFoundException,
   InternalServerErrorException,
+  ConflictException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
@@ -159,6 +160,17 @@ export class StreamerService {
     }
 
     if (streamer) {
+      // 이미 동일한 크루에 속해있는지 확인
+      if (
+        streamer.crew &&
+        memberData.crewId &&
+        streamer.crew.id === memberData.crewId
+      ) {
+        throw new ConflictException(
+          `스트리머 "${streamer.name}"은(는) 이미 해당 크루에 소속되어 있습니다.`,
+        );
+      }
+
       // 이미 등록된 스트리머면 크루와 랭크 정보만 업데이트
       if (memberData.crewId) {
         streamer.crew = { id: memberData.crewId } as any;
