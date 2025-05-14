@@ -2,12 +2,10 @@ import {
   Injectable,
   NotFoundException,
   InternalServerErrorException,
-  BadRequestException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Streamer } from '../../entities/streamer.entity';
-import { ErrorCode } from 'src/common/enums/error-codes.enum';
 import { StreamerCategoryService } from '../category/streamer-category.service';
 import { In } from 'typeorm';
 import { CrewRank } from '../../entities/crew-rank.entity';
@@ -142,40 +140,58 @@ export class StreamerService {
       order: {
         name: 'ASC',
       },
-      take: 10, // 결과 제한
     });
   }
 
   async create(memberData: any): Promise<Streamer> {
-    const existingStreamer = await this.streamerRepository.findOne({
-      where: { name: memberData.name },
-    });
+    // 이름 또는 soopId로 기존 스트리머 검색 (더 정확한 검색)
+    const query: any = {};
+    if (memberData.name) query.name = memberData.name;
+    if (memberData.soopId) query.soopId = memberData.soopId;
 
-    if (existingStreamer) {
-      throw new BadRequestException(ErrorCode.DUPLICATE_NAME);
+    // 두 값 중 하나라도 있으면 검색 진행
+    let streamer: Streamer = null;
+    if (Object.keys(query).length > 0) {
+      streamer = await this.streamerRepository.findOne({
+        where: query,
+        relations: ['crew', 'rank'],
+      });
     }
 
-    const member = this.streamerRepository.create({
-      name: memberData.name,
-      soopId: memberData.soopId,
-      crew: { id: memberData.crewId },
-      rank: { id: memberData.rankId },
-    });
+    if (streamer) {
+      // 이미 등록된 스트리머면 크루와 랭크 정보만 업데이트
+      if (memberData.crewId) {
+        streamer.crew = { id: memberData.crewId } as any;
+      }
 
-    const savedMember = await this.streamerRepository.save(member);
+      if (memberData.rankId) {
+        streamer.rank = { id: memberData.rankId } as any;
+      }
+    } else {
+      // 새로운 스트리머 생성
+      streamer = this.streamerRepository.create({
+        name: memberData.name,
+        soopId: memberData.soopId,
+        crew: memberData.crewId ? { id: memberData.crewId } : null,
+        rank: memberData.rankId ? { id: memberData.rankId } : null,
+      });
+    }
+
+    // 스트리머 저장
+    streamer = await this.streamerRepository.save(streamer);
 
     // 카테고리가 제공된 경우, 카테고리 설정
-    if (memberData.categoryIds && memberData.categoryIds.length > 0) {
+    if (memberData.categoryIds?.length > 0) {
       await this.streamerCategoryService.setStreamerCategories(
-        savedMember.id,
+        streamer.id,
         memberData.categoryIds,
       );
 
-      // 카테고리 관계를 포함하여 다시 조회
-      return this.findOne(savedMember.id);
+      // 모든 관계를 포함하여 다시 조회
+      return this.findOne(streamer.id);
     }
 
-    return savedMember;
+    return streamer;
   }
 
   async update(id: number, memberData: any): Promise<Streamer> {
