@@ -34,7 +34,7 @@ export class LiveStreamGateway
     this.server.emit('updateLiveStreamers', data);
   }
 
-  // 스트리머 업데이트 알림 
+  // 스트리머 업데이트 알림
   @SubscribeMessage('liveStreamersUpdated')
   @OnEvent(STREAM_EVENTS.UPDATE)
   liveStreamersUpdated(): void {

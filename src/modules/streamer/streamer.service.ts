@@ -11,6 +11,7 @@ import { ErrorCode } from 'src/common/enums/error-codes.enum';
 import { StreamerCategoryService } from '../category/streamer-category.service';
 import { In } from 'typeorm';
 import { CrewRank } from '../../entities/crew-rank.entity';
+import { ILike } from 'typeorm';
 
 @Injectable()
 export class StreamerService {
@@ -125,6 +126,23 @@ export class StreamerService {
         'streamerCategories',
         'streamerCategories.category',
       ],
+    });
+  }
+
+  // 스트리머 검색 (이름 또는 숲ID로 검색)
+  async searchStreamers(query: string): Promise<Streamer[]> {
+    return this.streamerRepository.find({
+      where: [{ name: ILike(`%${query}%`) }, { soopId: ILike(`%${query}%`) }],
+      relations: [
+        'rank',
+        'crew',
+        'streamerCategories',
+        'streamerCategories.category',
+      ],
+      order: {
+        name: 'ASC',
+      },
+      take: 10, // 결과 제한
     });
   }
 

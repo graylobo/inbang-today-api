@@ -23,7 +23,13 @@ export class StreamerController {
   async findAll(
     @Query('categoryName') categoryName?: string,
     @Query('categories') categories?: string,
+    @Query('search') search?: string,
   ): Promise<Streamer[]> {
+    // 검색어가 있는 경우
+    if (search) {
+      return this.streamerService.searchStreamers(search);
+    }
+
     // 여러 카테고리가 콤마로 구분되어 있는 경우
     if (categories) {
       const categoryNames = categories
