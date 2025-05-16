@@ -49,6 +49,8 @@ import { UserBadge } from 'src/entities/user-badge.entity';
 import { Badge } from 'src/entities/badge.entity';
 import { UserActivity } from 'src/entities/user-activity.entity';
 import { PurchasePointHistory } from 'src/entities/purchase-point-history.entity';
+import { CrewMemberHistory } from './entities/crew-member-history.entity';
+import { CrewMemberHistoryModule } from './modules/crew-member-history/crew-member-history.module';
 
 @Module({
   imports: [
@@ -111,6 +113,7 @@ import { PurchasePointHistory } from 'src/entities/purchase-point-history.entity
         UserBadge,
         Badge,
         PurchasePointHistory,
+        CrewMemberHistory,
       ],
       synchronize: true,
       // logging: true, // SQL 쿼리 로깅 활성화
@@ -138,6 +141,7 @@ import { PurchasePointHistory } from 'src/entities/purchase-point-history.entity
     AwsModule,
     CategoryModule,
     PointsModule,
+    CrewMemberHistoryModule,
   ],
   controllers: [AppController],
   providers: [AppService],
