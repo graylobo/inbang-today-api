@@ -19,16 +19,16 @@ export class Streamer {
   @PrimaryGeneratedColumn()
   id: number;
 
-  @Column()
+  @Column({ unique: true })
   name: string;
 
-  @Column({ nullable: true })
+  @Column({ nullable: true, unique: true })
   nickname: string;
 
-  @Column({ nullable: true })
+  @Column({ nullable: true, unique: true })
   soopId: string;
 
-  @Column({ nullable: true })
+  @Column({ nullable: true, unique: true })
   eloBoardId: string;
 
   @Column({
