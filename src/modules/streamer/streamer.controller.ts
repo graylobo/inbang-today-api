@@ -157,4 +157,18 @@ export class StreamerController {
       await this.streamerService.delete(id);
     }
   }
+
+  @UseGuards(AdminGuard)
+  @Post(':id/remove-from-crew')
+  async removeFromCrew(@Param('id') id: string): Promise<Streamer> {
+    try {
+      return await this.streamerService.removeFromCrew(+id);
+    } catch (error) {
+      if (error instanceof HttpException) throw error;
+      throw new HttpException(
+        'Failed to remove member from crew',
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      );
+    }
+  }
 }

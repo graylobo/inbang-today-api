@@ -332,4 +332,25 @@ export class StreamerService {
 
     return results;
   }
+
+  // Add new method to remove a member from their crew
+  async removeFromCrew(id: number): Promise<Streamer> {
+    // Find the member
+    const member = await this.findOne(id);
+    if (!member) {
+      throw new NotFoundException(`Member with ID ${id} not found`);
+    }
+
+    // If member is not in a crew, there's nothing to do
+    if (!member.crew) {
+      return member;
+    }
+
+    // Remove the member from the crew
+    member.crew = null;
+    member.rank = null; // Also remove their rank as it's tied to the crew
+
+    // Save the changes
+    return this.streamerRepository.save(member);
+  }
 }
