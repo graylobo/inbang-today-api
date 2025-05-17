@@ -353,4 +353,29 @@ export class StreamerService {
     // Save the changes
     return this.streamerRepository.save(member);
   }
+
+  // 스트리머를 특정 크루에 입사시키는 메서드
+  async joinCrew(
+    streamerId: number,
+    crewId: number,
+    rankId?: number,
+  ): Promise<Streamer> {
+    const streamer = await this.findOne(streamerId);
+    if (!streamer) {
+      throw new NotFoundException(`Streamer with ID ${streamerId} not found`);
+    }
+
+    // 크루 정보 업데이트
+    streamer.crew = { id: crewId } as any;
+    if (rankId) {
+      streamer.rank = { id: rankId } as any;
+    }
+
+    return this.streamerRepository.save(streamer);
+  }
+
+  // 스트리머를 크루에서 퇴사시키는 메서드 (removeFromCrew와 비슷하지만 분리)
+  async leaveCrew(streamerId: number): Promise<Streamer> {
+    return this.removeFromCrew(streamerId);
+  }
 }

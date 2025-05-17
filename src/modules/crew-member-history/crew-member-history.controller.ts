@@ -4,13 +4,15 @@ import {
   CreateCrewMemberHistoryDto,
 } from './crew-member-history.service';
 import { CrewMemberHistory } from '../../entities/crew-member-history.entity';
+import { JwtAuthGuard } from '../../guards/jwt-auth.guard';
 import { AdminGuard } from '../../guards/admin.guard';
-import { JwtAuthGuard } from 'src/guards/jwt-auth.guard';
+import { StreamerService } from '../streamer/streamer.service';
 
 @Controller('crew-member-histories')
 export class CrewMemberHistoryController {
   constructor(
     private readonly crewMemberHistoryService: CrewMemberHistoryService,
+    private readonly streamerService: StreamerService,
   ) {}
 
   @Post()
@@ -18,6 +20,16 @@ export class CrewMemberHistoryController {
   async create(
     @Body() createDto: CreateCrewMemberHistoryDto,
   ): Promise<CrewMemberHistory> {
+    if (createDto.eventType === 'join') {
+      await this.streamerService.joinCrew(
+        createDto.streamerId,
+        createDto.crewId,
+        createDto.rankId,
+      );
+    } else if (createDto.eventType === 'leave') {
+      await this.streamerService.leaveCrew(createDto.streamerId);
+    }
+
     return this.crewMemberHistoryService.create(createDto);
   }
 
