@@ -24,10 +24,15 @@ export class CrewMemberHistoryController {
       await this.streamerService.joinCrew(
         createDto.streamerId,
         createDto.crewId,
-        createDto.rankId,
+        createDto.newRankId,
       );
     } else if (createDto.eventType === 'leave') {
       await this.streamerService.leaveCrew(createDto.streamerId);
+    } else if (createDto.eventType === 'rank_change') {
+      await this.streamerService.updateRank(
+        createDto.streamerId,
+        createDto.newRankId,
+      );
     }
 
     return this.crewMemberHistoryService.create(createDto);

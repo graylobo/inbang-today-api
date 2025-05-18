@@ -376,6 +376,71 @@ export class StreamerService {
 
   // 스트리머를 크루에서 퇴사시키는 메서드 (removeFromCrew와 비슷하지만 분리)
   async leaveCrew(streamerId: number): Promise<Streamer> {
-    return this.removeFromCrew(streamerId);
+    const streamer = await this.findOne(streamerId);
+    if (!streamer) {
+      throw new NotFoundException(
+        `스트리머 ID ${streamerId}가 존재하지 않습니다.`,
+      );
+    }
+
+    // 크루에 속해있지 않은 경우
+    if (!streamer.crew) {
+      throw new ConflictException(`스트리머는 이미 크루에 속해있지 않습니다.`);
+    }
+
+    // 크루 및 직급 정보 제거
+    streamer.crew = null;
+    streamer.rank = null;
+
+    return this.streamerRepository.save(streamer);
+  }
+
+  /**
+   * 스트리머의 직급을 변경합니다.
+   * @param streamerId 스트리머 ID
+   * @param newRankId 새로운 직급 ID
+   * @returns 업데이트된 스트리머 정보
+   */
+  async updateRank(streamerId: number, newRankId: number): Promise<Streamer> {
+    const streamer = await this.findOne(streamerId);
+    if (!streamer) {
+      throw new NotFoundException(
+        `스트리머 ID ${streamerId}가 존재하지 않습니다.`,
+      );
+    }
+
+    // 크루에 속해있지 않은 경우
+    if (!streamer.crew) {
+      throw new ConflictException(
+        `크루에 속해있지 않은 스트리머의 직급을 변경할 수 없습니다.`,
+      );
+    }
+
+    // 새 직급 ID가 없는 경우
+    if (!newRankId) {
+      throw new ConflictException(`새 직급 ID가.유효하지 않습니다.`);
+    }
+
+    // 새 직급 정보 조회
+    const newRank = await this.crewRankRepository.findOne({
+      where: { id: newRankId },
+      relations: ['crew'],
+    });
+
+    if (!newRank) {
+      throw new NotFoundException(`직급 ID ${newRankId}가 존재하지 않습니다.`);
+    }
+
+    // 해당 직급이 스트리머의 현재 크루에 속하는지 확인
+    if (newRank.crew.id !== streamer.crew.id) {
+      throw new ConflictException(
+        `선택한 직급은 스트리머의 현재 크루에 속하지 않습니다.`,
+      );
+    }
+
+    // 직급 변경
+    streamer.rank = newRank;
+
+    return this.streamerRepository.save(streamer);
   }
 }

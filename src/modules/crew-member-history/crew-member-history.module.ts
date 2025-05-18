@@ -5,11 +5,12 @@ import { CrewMemberHistoryController } from 'src/modules/crew-member-history/cre
 import { CrewMemberHistoryService } from './crew-member-history.service';
 import { Streamer } from '../../entities/streamer.entity';
 import { Crew } from '../../entities/crew.entity';
+import { CrewRank } from '../../entities/crew-rank.entity';
 import { StreamerModule } from '../streamer/streamer.module';
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([CrewMemberHistory, Streamer, Crew]),
+    TypeOrmModule.forFeature([CrewMemberHistory, Streamer, Crew, CrewRank]),
     StreamerModule,
   ],
   controllers: [CrewMemberHistoryController],
