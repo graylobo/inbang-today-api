@@ -240,16 +240,16 @@ export class StreamerService {
 
   async delete(id: number): Promise<void> {
     try {
-      const member = await this.streamerRepository.findOne({
+      const streamer = await this.streamerRepository.findOne({
         where: { id },
         relations: ['earnings', 'streamerCategories'],
       });
 
-      if (!member) {
+      if (!streamer) {
         throw new NotFoundException('Member not found');
       }
 
-      await this.streamerRepository.remove(member);
+      await this.streamerRepository.remove(streamer);
     } catch (error) {
       if (error instanceof NotFoundException) {
         throw error;
