@@ -611,8 +611,8 @@ export class CrawlerService {
             currentCount,
             { timeout: 5000 },
           );
-        } catch (timeoutError) {
-          console.log('새로운 스트리머가 로드되지 않음');
+        } catch (error) {
+          console.log('새로운 스트리머가 로드되지 않음', error.message);
           // 여러 번 시도해도 변화가 없으면 종료
           const newStreamers = await page.locator('li[data-type="cBox"]').all();
           if (newStreamers.length <= currentCount) {
@@ -1256,6 +1256,68 @@ export class CrawlerService {
       throw new BadRequestException(`크롤링 실패: ${error.message}`);
     } finally {
       await this.closeBrowser();
+    }
+  }
+
+  async getLiveCrewsInfo() {
+    try {
+      // 전체 라이브 스트리밍 데이터 가져오기
+      const globalCachedData = (await this.redisService.get(
+        this.CACHE_ALL_STREAM_KEY,
+      )) as string;
+
+      if (!globalCachedData) {
+        return { crews: [] };
+      }
+
+      const allStreamData = JSON.parse(globalCachedData);
+      const allLiveStreams = allStreamData.streamInfos || [];
+
+      // 모든 크루 정보 가져오기
+      const crews = await this.crewRepository.find({
+        relations: ['members', 'members.rank'],
+      });
+
+      // 각 크루별로 라이브 스트리머 정보 계산
+      const crewsInfo = await Promise.all(
+        crews.map(async (crew) => {
+          // 크루원 ID 목록 추출
+          const memberIds = crew.members
+            .map((member) => member.soopId)
+            .filter(Boolean);
+
+          // 대표 스트리머 찾기 (rank.level === 1인 멤버들)
+          const representativeMemberIds = crew.members
+            .filter((member) => member.rank?.level === 1 && member.soopId)
+            .map((member) => member.soopId);
+
+          // 해당 크루에 속한 라이브 스트리머 필터링
+          const liveStreamers = allLiveStreams.filter((stream) => {
+            const streamerId = stream.profileUrl.split('/').pop() || '';
+            return memberIds.includes(streamerId);
+          });
+
+          // 크루 대표가 라이브 중인지 확인 (대표가 여러명일 수 있음)
+          const isOwnerLive =
+            representativeMemberIds.length > 0
+              ? allLiveStreams.some((stream) => {
+                  const streamerId = stream.profileUrl.split('/').pop() || '';
+                  return representativeMemberIds.includes(streamerId);
+                })
+              : false;
+
+          return {
+            id: crew.id,
+            liveStreamersCount: liveStreamers.length,
+            isOwnerLive,
+          };
+        }),
+      );
+
+      return { crews: crewsInfo };
+    } catch (error) {
+      console.error('Error getting live crews info:', error);
+      return { crews: [] };
     }
   }
 }

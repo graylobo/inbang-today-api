@@ -30,6 +30,11 @@ export class CrawlerController {
     });
   }
 
+  @Get('live-crews')
+  async getLiveCrewsInfo() {
+    return this.crawlerService.getLiveCrewsInfo();
+  }
+
   @Get('match-history')
   async getMatchHistory(@Query() query: GetSaveMatchDataDto) {
     return this.crawlerService.getMatchHistory(query.startDate, query.endDate);
