@@ -8,6 +8,7 @@ import {
 import { Streamer } from '../../entities/streamer.entity';
 import { Crew } from '../../entities/crew.entity';
 import { CrewRank } from '../../entities/crew-rank.entity';
+import { User } from '../../entities/user.entity';
 
 export interface CreateCrewMemberHistoryDto {
   streamerId: number;
@@ -17,11 +18,13 @@ export interface CreateCrewMemberHistoryDto {
   note: string;
   oldRankId?: number;
   newRankId?: number;
+  performedById?: number;
 }
 
 export interface UpdateCrewMemberHistoryDto {
   eventDate?: string;
   note?: string;
+  performedById?: number;
 }
 
 @Injectable()
@@ -35,6 +38,8 @@ export class CrewMemberHistoryService {
     private readonly crewRepository: Repository<Crew>,
     @InjectRepository(CrewRank)
     private readonly crewRankRepository: Repository<CrewRank>,
+    @InjectRepository(User)
+    private readonly userRepository: Repository<User>,
   ) {}
 
   async create(
@@ -48,6 +53,7 @@ export class CrewMemberHistoryService {
       note,
       oldRankId,
       newRankId,
+      performedById,
     } = createDto;
 
     // Find the streamer and crew
@@ -60,6 +66,14 @@ export class CrewMemberHistoryService {
 
     if (!streamer || !crew) {
       throw new Error('Streamer or crew not found');
+    }
+
+    // 작업 수행자 정보 조회 (있는 경우)
+    let performedBy = null;
+    if (performedById) {
+      performedBy = await this.userRepository.findOne({
+        where: { id: performedById },
+      });
     }
 
     // 이벤트 타입에 따른 enum 값 변환
@@ -135,6 +149,7 @@ export class CrewMemberHistoryService {
       eventType: eventTypeEnum,
       eventDate: new Date(eventDate),
       note,
+      performedBy,
     });
 
     // 직급 변경인 경우 직급 정보 추가
@@ -175,7 +190,7 @@ export class CrewMemberHistoryService {
   ): Promise<CrewMemberHistory> {
     const history = await this.crewMemberHistoryRepository.findOne({
       where: { id },
-      relations: ['streamer', 'crew', 'oldRank', 'newRank'],
+      relations: ['streamer', 'crew', 'oldRank', 'newRank', 'performedBy'],
     });
 
     if (!history) {
@@ -190,6 +205,18 @@ export class CrewMemberHistoryService {
     // 비고 업데이트
     if (updateDto.note !== undefined) {
       history.note = updateDto.note;
+    }
+
+    // 수행자 업데이트
+    if (updateDto.performedById !== undefined) {
+      if (updateDto.performedById) {
+        const performedBy = await this.userRepository.findOne({
+          where: { id: updateDto.performedById },
+        });
+        history.performedBy = performedBy;
+      } else {
+        history.performedBy = null;
+      }
     }
 
     // 변경사항 저장
@@ -212,7 +239,7 @@ export class CrewMemberHistoryService {
   async findAllByStreamerId(streamerId: number): Promise<CrewMemberHistory[]> {
     return this.crewMemberHistoryRepository.find({
       where: { streamer: { id: streamerId } },
-      relations: ['streamer', 'crew', 'oldRank', 'newRank'],
+      relations: ['streamer', 'crew', 'oldRank', 'newRank', 'performedBy'],
       order: { eventDate: 'DESC', createdAt: 'DESC' },
     });
   }
@@ -220,7 +247,7 @@ export class CrewMemberHistoryService {
   async findAllByCrewId(crewId: number): Promise<CrewMemberHistory[]> {
     return this.crewMemberHistoryRepository.find({
       where: { crew: { id: crewId } },
-      relations: ['streamer', 'crew', 'oldRank', 'newRank'],
+      relations: ['streamer', 'crew', 'oldRank', 'newRank', 'performedBy'],
       order: { eventDate: 'DESC', createdAt: 'DESC' },
     });
   }

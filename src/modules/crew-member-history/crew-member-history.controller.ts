@@ -7,6 +7,7 @@ import {
   Body,
   Param,
   UseGuards,
+  Request,
 } from '@nestjs/common';
 import {
   CrewMemberHistoryService,
@@ -29,7 +30,10 @@ export class CrewMemberHistoryController {
   @UseGuards(JwtAuthGuard, AdminGuard)
   async create(
     @Body() createDto: CreateCrewMemberHistoryDto,
+    @Request() req,
   ): Promise<CrewMemberHistory> {
+    createDto.performedById = req.user.userId;
+
     if (createDto.eventType === 'join') {
       await this.streamerService.joinCrew(
         createDto.streamerId,
@@ -53,7 +57,10 @@ export class CrewMemberHistoryController {
   async update(
     @Param('id') id: string,
     @Body() updateDto: UpdateCrewMemberHistoryDto,
+    @Request() req,
   ): Promise<CrewMemberHistory> {
+    updateDto.performedById = req.user.userId;
+
     return this.crewMemberHistoryService.update(+id, updateDto);
   }
 

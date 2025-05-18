@@ -3,6 +3,7 @@ import { Crew } from './crew.entity';
 import { Streamer } from './streamer.entity';
 import { BaseEntity } from 'src/entities/base.entity';
 import { CrewRank } from './crew-rank.entity';
+import { User } from './user.entity';
 
 export enum CrewMemberEventType {
   JOIN = 'join',
@@ -45,4 +46,7 @@ export class CrewMemberHistory extends BaseEntity {
 
   @ManyToOne(() => CrewRank, { nullable: true })
   newRank: CrewRank;
+
+  @ManyToOne(() => User, { nullable: true })
+  performedBy: User;
 }
