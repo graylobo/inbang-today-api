@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import {
@@ -17,6 +17,11 @@ export interface CreateCrewMemberHistoryDto {
   note: string;
   oldRankId?: number;
   newRankId?: number;
+}
+
+export interface UpdateCrewMemberHistoryDto {
+  eventDate?: string;
+  note?: string;
 }
 
 @Injectable()
@@ -162,6 +167,46 @@ export class CrewMemberHistoryService {
     }
 
     return this.crewMemberHistoryRepository.save(history);
+  }
+
+  async update(
+    id: number,
+    updateDto: UpdateCrewMemberHistoryDto,
+  ): Promise<CrewMemberHistory> {
+    const history = await this.crewMemberHistoryRepository.findOne({
+      where: { id },
+      relations: ['streamer', 'crew', 'oldRank', 'newRank'],
+    });
+
+    if (!history) {
+      throw new NotFoundException(`히스토리 ID ${id}를 찾을 수 없습니다.`);
+    }
+
+    // 이벤트 날짜 업데이트
+    if (updateDto.eventDate) {
+      history.eventDate = new Date(updateDto.eventDate);
+    }
+
+    // 비고 업데이트
+    if (updateDto.note !== undefined) {
+      history.note = updateDto.note;
+    }
+
+    // 변경사항 저장
+    await this.crewMemberHistoryRepository.save(history);
+    return history;
+  }
+
+  async remove(id: number): Promise<void> {
+    const history = await this.crewMemberHistoryRepository.findOne({
+      where: { id },
+    });
+
+    if (!history) {
+      throw new NotFoundException(`히스토리 ID ${id}를 찾을 수 없습니다.`);
+    }
+
+    await this.crewMemberHistoryRepository.remove(history);
   }
 
   async findAllByStreamerId(streamerId: number): Promise<CrewMemberHistory[]> {

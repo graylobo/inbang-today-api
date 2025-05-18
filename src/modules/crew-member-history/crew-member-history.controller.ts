@@ -1,7 +1,17 @@
-import { Controller, Get, Post, Body, Param, UseGuards } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Post,
+  Put,
+  Delete,
+  Body,
+  Param,
+  UseGuards,
+} from '@nestjs/common';
 import {
   CrewMemberHistoryService,
   CreateCrewMemberHistoryDto,
+  UpdateCrewMemberHistoryDto,
 } from './crew-member-history.service';
 import { CrewMemberHistory } from '../../entities/crew-member-history.entity';
 import { JwtAuthGuard } from '../../guards/jwt-auth.guard';
@@ -36,6 +46,21 @@ export class CrewMemberHistoryController {
     }
 
     return this.crewMemberHistoryService.create(createDto);
+  }
+
+  @Put(':id')
+  @UseGuards(JwtAuthGuard, AdminGuard)
+  async update(
+    @Param('id') id: string,
+    @Body() updateDto: UpdateCrewMemberHistoryDto,
+  ): Promise<CrewMemberHistory> {
+    return this.crewMemberHistoryService.update(+id, updateDto);
+  }
+
+  @Delete(':id')
+  @UseGuards(JwtAuthGuard, AdminGuard)
+  async remove(@Param('id') id: string): Promise<void> {
+    return this.crewMemberHistoryService.remove(+id);
   }
 
   @Get('streamer/:id')
