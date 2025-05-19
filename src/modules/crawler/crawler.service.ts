@@ -29,6 +29,8 @@ import { StreamInfo } from 'src/modules/crawler/type';
 import { RedisService } from 'src/modules/redis/redis.service';
 import { formatDateString } from 'src/utils/format-date-string.utils';
 import { Between, ILike, In, IsNull, Repository } from 'typeorm';
+import { subMonths, format, startOfMonth, endOfMonth } from 'date-fns';
+import { StreamerEloRecord } from 'src/entities/streamer-elo-record.entity';
 
 export interface MatchData {
   date: string;
@@ -56,6 +58,8 @@ export class CrawlerService {
     private readonly starCraftGameMatchRepository: Repository<StarCraftGameMatch>,
     @InjectRepository(Category)
     private readonly categoryRepository: Repository<Category>,
+    @InjectRepository(StreamerEloRecord)
+    private readonly streamerEloRecordRepository: Repository<StreamerEloRecord>,
     private readonly streamerCategoryService: StreamerCategoryService,
     private readonly redisService: RedisService,
     private readonly eventEmitter: EventEmitter2,
@@ -167,18 +171,13 @@ export class CrawlerService {
 
   async getMatchHistory(startDate: string, endDate: string) {
     try {
-      const formData = new URLSearchParams({
-        wr_1: startDate,
-        wr_2: endDate,
-      });
+      // const formData = new URLSearchParams({
+      //   wr_1: startDate,
+      //   wr_2: endDate,
+      // });
 
       // const eloBoardUrl = 'https://eloboard.com/men/bbs/search_bj_list.php';
-      const eloBoardUrl =
-        'https://eloboard.com/women/bbs/board.php?bo_table=bj_board&page=1';
 
-      const getResponse = await firstValueFrom(
-        this.httpService.get(eloBoardUrl),
-      );
       // const response = await firstValueFrom(
       //   this.httpService.post(eloBoardUrl, formData.toString(), {
       //     headers: {
@@ -190,6 +189,13 @@ export class CrawlerService {
       // );
 
       // return response.data;
+      const eloBoardUrl =
+        'https://eloboard.com/women/bbs/board.php?bo_table=bj_board&page=1';
+
+      const getResponse = await firstValueFrom(
+        this.httpService.get(eloBoardUrl),
+      );
+
       return this.parseMatchDataFromTable(getResponse.data);
     } catch (error) {
       console.error('전적 조회 실패:', error);
@@ -1318,6 +1324,222 @@ export class CrawlerService {
     } catch (error) {
       console.error('Error getting live crews info:', error);
       return { crews: [] };
+    }
+  }
+
+  /**
+   * 매월 1일에 실행되어 전월의 스트리머 eloPoint를 크롤링하고 저장하는 cron job
+   */
+  @Cron('0 0 0 1 * *') // 매월 1일 00:00:00에 실행
+  async crawlMonthlyEloPoints() {
+    console.log(
+      '월간 스트리머 ELO 포인트 크롤링 시작:',
+      new Date().toISOString(),
+    );
+
+    try {
+      // 전월의 첫째날과 마지막날 계산
+      const prevMonth = subMonths(new Date(), 1);
+      const startDate = startOfMonth(prevMonth);
+      const endDate = endOfMonth(prevMonth);
+
+      // 크롤링을 위한 날짜 형식으로 변환 (YYYYMMDD)
+      const startDateStr = format(startDate, 'yyyyMMdd');
+      const endDateStr = format(endDate, 'yyyyMMdd');
+
+      console.log(`크롤링 날짜 범위: ${startDateStr} ~ ${endDateStr}`);
+
+      // form-data 구성
+      const formData = new FormData();
+      formData.append('wr_1', startDateStr);
+      formData.append('wr_2', endDateStr);
+      formData.append('b_id', 'eloboard');
+
+      console.log('API 요청 전송 중...');
+
+      // POST 요청 보내기
+      const response = await firstValueFrom(
+        this.httpService.post(
+          'https://eloboard.com/women/bbs/year_month_list.php',
+          formData,
+        ),
+      );
+
+      console.log('API 응답 수신 완료, 상태 코드:', response.status);
+      const html = response.data;
+
+      // HTML 응답의 일부분을 출력해 구조 확인
+      console.log('HTML 응답 일부:', html.substring(0, 500));
+
+      // HTML 파싱
+      const $ = cheerio.load(html);
+      console.log('HTML 파싱 완료');
+
+      // HTML 내의 모든 태그 종류를 확인
+      const allTags = new Set();
+      $('*').each((_, el) => {
+        if (el.type === 'tag' && el.name) {
+          allTags.add(el.name);
+        }
+      });
+      console.log('HTML 내 발견된 태그들:', Array.from(allTags));
+
+      // 다양한 선택자로 테이블 찾기 시도
+      console.log('table 태그 수:', $('table').length);
+      console.log('tr 태그 수:', $('tr').length);
+      console.log('td 태그 수:', $('td').length);
+
+      // 직접 HTML 내용에서 td[width="20"] 찾기
+      const widthPattern = /td width=20 style=text-align:right/g;
+      const widthMatches = html.match(widthPattern);
+      console.log(
+        'HTML에서 직접 찾은 td[width=20] 개수:',
+        widthMatches ? widthMatches.length : 0,
+      );
+
+      const eloPointsMap = new Map<string, number>();
+
+      // HTML 내용이 문자열 형태로만 있고 파싱되지 않는 경우 정규식으로 직접 추출
+      // eloPoint를 담고 있는 패턴: td width=20 style=text-align:right>숫자</td>
+      const eloPattern = /td width=20 style=text-align:right>([0-9,.]+)<\/td>/g;
+      let eloMatch;
+      const eloPoints = [];
+
+      while ((eloMatch = eloPattern.exec(html)) !== null) {
+        eloPoints.push(eloMatch[1]);
+      }
+
+      console.log('정규식으로 찾은 eloPoint 값들:', eloPoints);
+
+      // 스트리머 이름을 찾는 패턴
+      // 기존 패턴이 이미지 태그 닫힘 방식 매칭에 실패함
+      // const namePattern = /<td width=100 class=list-subject text-center><a[^>]*>.*?<\/img> ([^<]+)/g;
+
+      // 수정된 패턴: img 태그 다음에 오는 텍스트 추출
+      const namePattern =
+        /<td width=100 class=list-subject text-center><a[^>]*><img[^>]*\/>\s*([^<]+)/g;
+      let nameMatch;
+      const names = [];
+
+      while ((nameMatch = namePattern.exec(html)) !== null) {
+        // 이름 추출 및 T, P, Z 제거
+        const fullName = nameMatch[1].trim();
+        const name = fullName.split(' ')[0]; // 예: "서지수 T" -> "서지수"
+        names.push(name);
+        console.log(`이름 찾음: "${fullName}" -> "${name}"`);
+      }
+
+      console.log('정규식으로 찾은 스트리머 이름들:', names);
+
+      // 이름과 eloPoint 매핑
+      if (names.length === eloPoints.length) {
+        for (let i = 0; i < names.length; i++) {
+          const name = names[i];
+          const eloPointText = eloPoints[i];
+          const eloPoint = parseFloat(eloPointText.replace(/,/g, ''));
+
+          if (name && !isNaN(eloPoint)) {
+            eloPointsMap.set(name, eloPoint);
+            console.log(`맵에 추가됨: ${name} => ${eloPoint}`);
+          }
+        }
+      } else {
+        console.error(
+          '추출된 이름과 eloPoint 수가 일치하지 않음:',
+          names.length,
+          eloPoints.length,
+        );
+      }
+
+      console.log(
+        `총 ${eloPointsMap.size}개의 스트리머 eloPoint 데이터 추출 완료`,
+      );
+      console.log('추출된 데이터:', Object.fromEntries(eloPointsMap));
+
+      // DB에 기록
+      if (eloPointsMap.size > 0) {
+        await this.saveEloPoints(eloPointsMap, startDate);
+        console.log(
+          '월간 스트리머 ELO 포인트 크롤링 완료:',
+          eloPointsMap.size,
+          '명의 스트리머 데이터 처리됨',
+        );
+      } else {
+        console.error('추출된 데이터가 없어 저장을 진행하지 않습니다.');
+      }
+    } catch (error) {
+      console.error('월간 스트리머 ELO 포인트 크롤링 실패:', error);
+      // 스택 트레이스도 출력
+      console.error(error.stack);
+    }
+  }
+
+  /**
+   * 파싱한 eloPoint를 DB에 저장
+   */
+  private async saveEloPoints(
+    eloPointsMap: Map<string, number>,
+    recordDate: Date,
+  ) {
+    // 모든 스트리머 조회
+    const streamers = await this.streamerRepository.find({
+      where: {
+        gender: StreamerGender.Female, // 여성 스트리머만 대상으로 함
+      },
+    });
+
+    const records: StreamerEloRecord[] = [];
+    const month = format(recordDate, 'yyyy-MM');
+
+    for (const streamer of streamers) {
+      // 스트리머 이름으로 eloPoint 찾기
+      // 이름이 정확히 일치하지 않을 수 있으므로 부분 일치도 검색
+      let eloPoint: number | undefined;
+
+      // 정확한 이름 매칭 시도
+      if (eloPointsMap.has(streamer.name)) {
+        eloPoint = eloPointsMap.get(streamer.name);
+      } else {
+        // 부분 매칭: 이름이 포함된 키 찾기
+        for (const [name, point] of eloPointsMap.entries()) {
+          if (name.includes(streamer.name) || streamer.name.includes(name)) {
+            eloPoint = point;
+            break;
+          }
+        }
+      }
+
+      if (eloPoint) {
+        // 이미 해당 월에 기록이 있는지 확인
+        const existingRecord = await this.streamerEloRecordRepository.findOne({
+          where: {
+            streamer: { id: streamer.id },
+            month,
+          },
+        });
+
+        if (existingRecord) {
+          // 기존 기록 업데이트
+          existingRecord.eloPoint = eloPoint;
+          records.push(existingRecord);
+        } else {
+          // 새 기록 생성
+          const record = new StreamerEloRecord();
+          record.streamer = streamer;
+          record.month = month;
+          record.eloPoint = eloPoint;
+          record.recordDate = recordDate;
+          records.push(record);
+        }
+      }
+    }
+
+    // 일괄 저장
+    if (records.length > 0) {
+      await this.streamerEloRecordRepository.save(records);
+      console.log(
+        `${records.length}개의 스트리머 ELO 포인트 기록이 저장되었습니다.`,
+      );
     }
   }
 }

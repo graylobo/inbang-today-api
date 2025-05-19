@@ -51,6 +51,7 @@ import { UserActivity } from 'src/entities/user-activity.entity';
 import { PurchasePointHistory } from 'src/entities/purchase-point-history.entity';
 import { CrewMemberHistory } from './entities/crew-member-history.entity';
 import { CrewMemberHistoryModule } from './modules/crew-member-history/crew-member-history.module';
+import { StreamerEloRecord } from './entities/streamer-elo-record.entity';
 
 @Module({
   imports: [
@@ -114,6 +115,7 @@ import { CrewMemberHistoryModule } from './modules/crew-member-history/crew-memb
         Badge,
         PurchasePointHistory,
         CrewMemberHistory,
+        StreamerEloRecord,
       ],
       synchronize: true,
       // logging: true, // SQL 쿼리 로깅 활성화

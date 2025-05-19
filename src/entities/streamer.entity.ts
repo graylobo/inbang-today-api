@@ -9,6 +9,7 @@ import { Crew } from './crew.entity';
 import { CrewRank } from './crew-rank.entity';
 import { CrewEarning } from './crew-earning.entity';
 import { StreamerCategory } from './streamer-category.entity';
+import { StreamerEloRecord } from './streamer-elo-record.entity';
 import {
   StarCraftRace,
   StreamerGender,
@@ -62,4 +63,7 @@ export class Streamer {
     (streamerCategory) => streamerCategory.streamer,
   )
   streamerCategories: StreamerCategory[];
+
+  @OneToMany(() => StreamerEloRecord, (eloRecord) => eloRecord.streamer)
+  eloRecords: StreamerEloRecord[];
 }
