@@ -1349,31 +1349,69 @@ export class CrawlerService {
 
       console.log(`크롤링 날짜 범위: ${startDateStr} ~ ${endDateStr}`);
 
+      // 여성 스트리머 전적 크롤링
+      console.log('여성 스트리머 ELO 포인트 크롤링 시작');
+      const womenEloPoints = await this.crawlEloPoints(
+        'https://eloboard.com/women/bbs/year_month_list.php',
+        startDateStr,
+        endDateStr,
+        StreamerGender.Female,
+      );
+
+      // 남성 스트리머 전적 크롤링
+      console.log('남성 스트리머 ELO 포인트 크롤링 시작');
+      const menEloPoints = await this.crawlEloPoints(
+        'https://eloboard.com/men/bbs/year_month_list.php',
+        startDateStr,
+        endDateStr,
+        StreamerGender.Male,
+      );
+
+      console.log(
+        `여성 스트리머 ${womenEloPoints.size}명, 남성 스트리머 ${menEloPoints.size}명의 ELO 포인트 크롤링 완료`,
+      );
+    } catch (error) {
+      console.error('월간 스트리머 ELO 포인트 크롤링 실패:', error);
+      // 스택 트레이스도 출력
+      console.error(error.stack);
+    }
+  }
+
+  /**
+   * 지정된 URL에서 ELO 포인트를 크롤링하는 재사용 가능한 메서드
+   */
+  private async crawlEloPoints(
+    url: string,
+    startDateStr: string,
+    endDateStr: string,
+    gender: StreamerGender,
+  ): Promise<Map<string, number>> {
+    try {
       // form-data 구성
       const formData = new FormData();
       formData.append('wr_1', startDateStr);
       formData.append('wr_2', endDateStr);
       formData.append('b_id', 'eloboard');
 
-      console.log('API 요청 전송 중...');
+      console.log(`${gender} 스트리머 API 요청 전송 중...`);
 
       // POST 요청 보내기
       const response = await firstValueFrom(
-        this.httpService.post(
-          'https://eloboard.com/women/bbs/year_month_list.php',
-          formData,
-        ),
+        this.httpService.post(url, formData),
       );
 
-      console.log('API 응답 수신 완료, 상태 코드:', response.status);
+      console.log(
+        `${gender} 스트리머 API 응답 수신 완료, 상태 코드:`,
+        response.status,
+      );
       const html = response.data;
 
       // HTML 응답의 일부분을 출력해 구조 확인
-      console.log('HTML 응답 일부:', html.substring(0, 500));
+      console.log(`${gender} 스트리머 HTML 응답 일부:`, html.substring(0, 500));
 
       // HTML 파싱
       const $ = cheerio.load(html);
-      console.log('HTML 파싱 완료');
+      console.log(`${gender} 스트리머 HTML 파싱 완료`);
 
       // HTML 내의 모든 태그 종류를 확인
       const allTags = new Set();
@@ -1382,18 +1420,21 @@ export class CrawlerService {
           allTags.add(el.name);
         }
       });
-      console.log('HTML 내 발견된 태그들:', Array.from(allTags));
+      console.log(
+        `${gender} 스트리머 HTML 내 발견된 태그들:`,
+        Array.from(allTags),
+      );
 
       // 다양한 선택자로 테이블 찾기 시도
-      console.log('table 태그 수:', $('table').length);
-      console.log('tr 태그 수:', $('tr').length);
-      console.log('td 태그 수:', $('td').length);
+      console.log(`${gender} 스트리머 table 태그 수:`, $('table').length);
+      console.log(`${gender} 스트리머 tr 태그 수:`, $('tr').length);
+      console.log(`${gender} 스트리머 td 태그 수:`, $('td').length);
 
       // 직접 HTML 내용에서 td[width="20"] 찾기
       const widthPattern = /td width=20 style=text-align:right/g;
       const widthMatches = html.match(widthPattern);
       console.log(
-        'HTML에서 직접 찾은 td[width=20] 개수:',
+        `${gender} 스트리머 HTML에서 직접 찾은 td[width=20] 개수:`,
         widthMatches ? widthMatches.length : 0,
       );
 
@@ -1409,12 +1450,12 @@ export class CrawlerService {
         eloPoints.push(eloMatch[1]);
       }
 
-      console.log('정규식으로 찾은 eloPoint 값들:', eloPoints);
+      console.log(
+        `${gender} 스트리머 정규식으로 찾은 eloPoint 값들:`,
+        eloPoints.length,
+      );
 
       // 스트리머 이름을 찾는 패턴
-      // 기존 패턴이 이미지 태그 닫힘 방식 매칭에 실패함
-      // const namePattern = /<td width=100 class=list-subject text-center><a[^>]*>.*?<\/img> ([^<]+)/g;
-
       // 수정된 패턴: img 태그 다음에 오는 텍스트 추출
       const namePattern =
         /<td width=100 class=list-subject text-center><a[^>]*><img[^>]*\/>\s*([^<]+)/g;
@@ -1426,10 +1467,13 @@ export class CrawlerService {
         const fullName = nameMatch[1].trim();
         const name = fullName.split(' ')[0]; // 예: "서지수 T" -> "서지수"
         names.push(name);
-        console.log(`이름 찾음: "${fullName}" -> "${name}"`);
+        console.log(`${gender} 스트리머 이름 찾음: "${fullName}" -> "${name}"`);
       }
 
-      console.log('정규식으로 찾은 스트리머 이름들:', names);
+      console.log(
+        `${gender} 스트리머 정규식으로 찾은 스트리머 이름들:`,
+        names.length,
+      );
 
       // 이름과 eloPoint 매핑
       if (names.length === eloPoints.length) {
@@ -1440,106 +1484,171 @@ export class CrawlerService {
 
           if (name && !isNaN(eloPoint)) {
             eloPointsMap.set(name, eloPoint);
-            console.log(`맵에 추가됨: ${name} => ${eloPoint}`);
+            console.log(
+              `${gender} 스트리머 맵에 추가됨: ${name} => ${eloPoint}`,
+            );
           }
         }
       } else {
         console.error(
-          '추출된 이름과 eloPoint 수가 일치하지 않음:',
+          `${gender} 스트리머 추출된 이름과 eloPoint 수가 일치하지 않음:`,
           names.length,
           eloPoints.length,
         );
       }
 
       console.log(
-        `총 ${eloPointsMap.size}개의 스트리머 eloPoint 데이터 추출 완료`,
+        `${gender} 스트리머 총 ${eloPointsMap.size}개의 데이터 추출 완료`,
       );
-      console.log('추출된 데이터:', Object.fromEntries(eloPointsMap));
 
       // DB에 기록
       if (eloPointsMap.size > 0) {
-        await this.saveEloPoints(eloPointsMap, startDate);
+        const recordDate = new Date(
+          startDateStr.substring(0, 4) +
+            '-' +
+            startDateStr.substring(4, 6) +
+            '-01',
+        );
+        await this.saveEloPoints(eloPointsMap, recordDate, gender);
         console.log(
-          '월간 스트리머 ELO 포인트 크롤링 완료:',
+          `${gender} 스트리머 ELO 포인트 크롤링 및 저장 완료:`,
           eloPointsMap.size,
-          '명의 스트리머 데이터 처리됨',
+          '명의 데이터',
         );
       } else {
-        console.error('추출된 데이터가 없어 저장을 진행하지 않습니다.');
+        console.error(
+          `${gender} 스트리머 추출된 데이터가 없어 저장을 진행하지 않습니다.`,
+        );
       }
+
+      return eloPointsMap;
     } catch (error) {
-      console.error('월간 스트리머 ELO 포인트 크롤링 실패:', error);
-      // 스택 트레이스도 출력
-      console.error(error.stack);
+      console.error(`${gender} 스트리머 ELO 포인트 크롤링 실패:`, error);
+      return new Map();
     }
   }
 
   /**
-   * 파싱한 eloPoint를 DB에 저장
+   * 파싱한 eloPoint를 DB에 저장 (트랜잭션 적용)
    */
   private async saveEloPoints(
     eloPointsMap: Map<string, number>,
     recordDate: Date,
+    gender: StreamerGender,
   ) {
-    // 모든 스트리머 조회
-    const streamers = await this.streamerRepository.find({
-      where: {
-        gender: StreamerGender.Female, // 여성 스트리머만 대상으로 함
-      },
-    });
+    // eloPointsMap이 비어있으면 아무 작업도 하지 않음
+    if (eloPointsMap.size === 0) {
+      console.log(`${gender} 스트리머 저장할 ELO 데이터가 없습니다.`);
+      return;
+    }
 
-    const records: StreamerEloRecord[] = [];
     const month = format(recordDate, 'yyyy-MM');
+    console.log(`${gender} 스트리머 ${month} 기간의 ELO 포인트 저장 시작`);
 
-    for (const streamer of streamers) {
-      // 스트리머 이름으로 eloPoint 찾기
-      // 이름이 정확히 일치하지 않을 수 있으므로 부분 일치도 검색
-      let eloPoint: number | undefined;
-
-      // 정확한 이름 매칭 시도
-      if (eloPointsMap.has(streamer.name)) {
-        eloPoint = eloPointsMap.get(streamer.name);
-      } else {
-        // 부분 매칭: 이름이 포함된 키 찾기
-        for (const [name, point] of eloPointsMap.entries()) {
-          if (name.includes(streamer.name) || streamer.name.includes(name)) {
-            eloPoint = point;
-            break;
-          }
-        }
-      }
-
-      if (eloPoint) {
-        // 이미 해당 월에 기록이 있는지 확인
-        const existingRecord = await this.streamerEloRecordRepository.findOne({
+    // 트랜잭션 시작
+    await this.streamerEloRecordRepository.manager
+      .transaction(async (transactionalEntityManager) => {
+        // 트랜잭션 내에서 해당 성별의 모든 스트리머 조회
+        const streamers = await transactionalEntityManager.find(Streamer, {
           where: {
-            streamer: { id: streamer.id },
-            month,
+            gender: gender,
           },
         });
 
-        if (existingRecord) {
-          // 기존 기록 업데이트
-          existingRecord.eloPoint = eloPoint;
-          records.push(existingRecord);
-        } else {
-          // 새 기록 생성
-          const record = new StreamerEloRecord();
-          record.streamer = streamer;
-          record.month = month;
-          record.eloPoint = eloPoint;
-          record.recordDate = recordDate;
-          records.push(record);
+        if (streamers.length === 0) {
+          console.log(`${gender} 스트리머가 없습니다.`);
+          return;
         }
-      }
-    }
 
-    // 일괄 저장
-    if (records.length > 0) {
-      await this.streamerEloRecordRepository.save(records);
-      console.log(
-        `${records.length}개의 스트리머 ELO 포인트 기록이 저장되었습니다.`,
-      );
-    }
+        console.log(
+          `${gender} 스트리머 ${streamers.length}명에 대한 ELO 포인트 처리 중...`,
+        );
+
+        // 해당 월의 모든 기존 기록을 한번에 조회 (N+1 쿼리 문제 방지)
+        const existingRecords = await transactionalEntityManager.find(
+          StreamerEloRecord,
+          {
+            where: {
+              month: month,
+              streamer: {
+                gender: gender,
+              },
+            },
+            relations: ['streamer'],
+          },
+        );
+
+        // 스트리머 ID로 인덱싱된 기존 기록 맵 생성
+        const recordMap = new Map(
+          existingRecords.map((record) => [record.streamer.id, record]),
+        );
+
+        // 모든 레코드를 담을 배열
+        const recordsToSave: StreamerEloRecord[] = [];
+        let updatedCount = 0;
+        let createdCount = 0;
+
+        for (const streamer of streamers) {
+          // 스트리머 이름으로 eloPoint 찾기
+          let eloPoint: number | undefined;
+
+          // 정확한 이름 매칭 시도
+          if (eloPointsMap.has(streamer.name)) {
+            eloPoint = eloPointsMap.get(streamer.name);
+          } else {
+            // 부분 매칭: 이름이 포함된 키 찾기
+            for (const [name, point] of eloPointsMap.entries()) {
+              if (
+                name.includes(streamer.name) ||
+                streamer.name.includes(name)
+              ) {
+                eloPoint = point;
+                console.log(
+                  `${gender} 스트리머 "${streamer.name}" -> "${name}" 부분 매칭으로 eloPoint ${point} 찾음`,
+                );
+                break;
+              }
+            }
+          }
+
+          if (eloPoint) {
+            // 기존 기록이 있는지 확인
+            const existingRecord = recordMap.get(streamer.id);
+
+            if (existingRecord) {
+              // 기존 기록 업데이트
+              existingRecord.eloPoint = eloPoint;
+              recordsToSave.push(existingRecord);
+              updatedCount++;
+            } else {
+              // 새 기록 생성
+              const record = new StreamerEloRecord();
+              record.streamer = streamer;
+              record.month = month;
+              record.eloPoint = eloPoint;
+              record.recordDate = recordDate;
+              recordsToSave.push(record);
+              createdCount++;
+            }
+          }
+        }
+
+        // 트랜잭션 내에서 일괄 저장
+        if (recordsToSave.length > 0) {
+          await transactionalEntityManager.save(recordsToSave);
+          console.log(
+            `${gender} 스트리머 ELO 포인트 저장 완료: 총 ${recordsToSave.length}개 (업데이트: ${updatedCount}, 신규: ${createdCount})`,
+          );
+        } else {
+          console.log(`${gender} 스트리머 저장할 ELO 데이터가 없습니다.`);
+        }
+      })
+      .catch((error) => {
+        console.error(
+          `${gender} 스트리머 ELO 포인트 저장 중 오류 발생:`,
+          error,
+        );
+        throw error; // 상위 호출자에게 오류 전파
+      });
   }
 }
