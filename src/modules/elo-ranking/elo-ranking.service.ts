@@ -47,6 +47,7 @@ export class EloRankingService {
         id: streamer.id,
         name: streamer.name,
         nickname: streamer.nickname,
+        soopId: streamer.soopId,
         tier: streamer.tier,
         race: streamer.race,
         gender: streamer.gender,

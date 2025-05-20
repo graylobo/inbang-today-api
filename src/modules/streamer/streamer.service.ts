@@ -58,12 +58,7 @@ export class StreamerService {
     // 해당 ID에 해당하는 모든 스트리머 정보 조회 (관계 포함)
     return this.streamerRepository.find({
       where: { id: In(streamerIds) },
-      relations: [
-        'crew',
-        'rank',
-        'streamerCategories',
-        'streamerCategories.category',
-      ],
+      relations: ['crew', 'rank'],
       order: {
         crew: { name: 'ASC' },
         rank: { level: 'ASC' },
