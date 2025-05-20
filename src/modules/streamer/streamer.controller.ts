@@ -21,7 +21,6 @@ export class StreamerController {
 
   @Get()
   async findAll(
-    @Query('categoryName') categoryName?: string,
     @Query('categories') categories?: string,
     @Query('search') search?: string,
   ): Promise<Streamer[]> {
@@ -39,11 +38,6 @@ export class StreamerController {
       if (categoryNames.length > 0) {
         return this.streamerService.findAllByMultipleCategories(categoryNames);
       }
-    }
-
-    // 단일 카테고리 이름인 경우
-    if (categoryName) {
-      return this.streamerService.findAllByCategoryName(categoryName);
     }
 
     // 카테고리 필터가 없는 경우 전체 조회
