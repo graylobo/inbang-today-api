@@ -52,6 +52,7 @@ import { PurchasePointHistory } from 'src/entities/purchase-point-history.entity
 import { CrewMemberHistory } from './entities/crew-member-history.entity';
 import { CrewMemberHistoryModule } from './modules/crew-member-history/crew-member-history.module';
 import { StreamerEloRecord } from './entities/streamer-elo-record.entity';
+import { EloRankingModule } from './modules/elo-ranking/elo-ranking.module';
 
 @Module({
   imports: [
@@ -144,6 +145,7 @@ import { StreamerEloRecord } from './entities/streamer-elo-record.entity';
     CategoryModule,
     PointsModule,
     CrewMemberHistoryModule,
+    EloRankingModule,
   ],
   controllers: [AppController],
   providers: [AppService],
