@@ -17,13 +17,17 @@ import { Comment } from '../entities/comment.entity';
     BullModule.registerQueue({
       name: 'likes',
     }),
-    CacheModule.register({
-      store: redisStore as any,
-      socket: {
-        host: process.env.REDIS_HOST || 'redis',
-        port: parseInt(process.env.REDIS_PORT, 10) || 6379,
+    CacheModule.registerAsync({
+      useFactory: () => {
+        return {
+          store: redisStore as any,
+          socket: {
+            host: process.env.REDIS_HOST || 'redis',
+            port: parseInt(process.env.REDIS_PORT, 10) || 6379,
+          },
+          ttl: 60 * 60 * 24, // 24시간
+        };
       },
-      ttl: 60 * 60 * 24, // 24시간
     }),
   ],
   controllers: [LikesController],
