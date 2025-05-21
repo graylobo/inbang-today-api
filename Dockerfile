@@ -20,7 +20,7 @@ COPY . .
 RUN npm run build
 
 # 실행 단계: 최신 Playwright 이미지 사용
-FROM mcr.microsoft.com/playwright:v1.49.0-jammy AS production
+FROM mcr.microsoft.com/playwright:v1.52.0-jammy AS production
 
 WORKDIR /app
 
