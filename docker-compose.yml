@@ -14,13 +14,6 @@ services:
       - redis
     env_file:
       - .env.${ENVIRONMENT}
-    environment:
-      - NODE_ENV=${ENVIRONMENT}
-      - DB_HOST=${DB_HOST}
-      - DB_PORT=${DB_PORT}
-      - REDIS_HOST=${REDIS_HOST}
-      - REDIS_PORT=${REDIS_PORT}
-      - DISABLE_SSL=${DISABLE_SSL}
     networks:
       - inbang-network
 
@@ -28,8 +21,6 @@ services:
     image: postgres:15-alpine
     container_name: inbang-postgres
     restart: always
-    env_file:
-      - .env.${ENVIRONMENT}
     environment:
       - POSTGRES_USER=${DB_USERNAME}
       - POSTGRES_PASSWORD=${DB_PASSWORD}

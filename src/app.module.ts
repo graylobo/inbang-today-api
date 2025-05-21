@@ -123,7 +123,7 @@ import { EloRankingModule } from './modules/elo-ranking/elo-ranking.module';
     }),
     BullModule.forRoot({
       connection: {
-        host: process.env.REDIS_HOST || 'localhost',
+        host: process.env.REDIS_HOST || 'redis',
         port: parseInt(process.env.REDIS_PORT, 10) || 6379,
       },
     }),

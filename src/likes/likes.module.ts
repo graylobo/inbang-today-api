@@ -19,8 +19,10 @@ import { Comment } from '../entities/comment.entity';
     }),
     CacheModule.register({
       store: redisStore as any,
-      host: process.env.REDIS_HOST || 'localhost',
-      port: parseInt(process.env.REDIS_PORT, 10) || 6379,
+      socket: {
+        host: process.env.REDIS_HOST || 'redis',
+        port: parseInt(process.env.REDIS_PORT, 10) || 6379,
+      },
       ttl: 60 * 60 * 24, // 24시간
     }),
   ],
