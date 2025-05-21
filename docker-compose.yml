@@ -44,6 +44,8 @@ services:
       - inbang-network
   nginx:
     image: nginx:latest
+    depends_on:
+      - app
     ports:
       - '80:80'
       - '443:443'
@@ -52,6 +54,8 @@ services:
       - ./.well-known/acme-challenge/:/etc/nginx/acme-challenge/
       - ./html/:/etc/nginx/html/
       - ./letsencrypt:/etc/letsencrypt
+    networks:
+      - inbang-network # Make sure this matches the network in your app service
 
 networks:
   inbang-network:
