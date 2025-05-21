@@ -42,6 +42,16 @@ services:
       - redis_data:/data
     networks:
       - inbang-network
+  nginx:
+    image: nginx:latest
+    ports:
+      - '80:80'
+      - '443:443'
+    volumes:
+      - ./nginx.conf:/etc/nginx/conf.d/default.conf
+      - ./.well-known/acme-challenge/:/etc/nginx/acme-challenge/
+      - ./html/:/etc/nginx/html/
+      - ./letsencrypt:/etc/letsencrypt
 
 networks:
   inbang-network:
