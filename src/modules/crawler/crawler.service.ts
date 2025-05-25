@@ -84,11 +84,14 @@ export class CrawlerService {
       : this.CACHE_ALL_STREAM_KEY;
 
     // 캐시된 데이터 반환 (항상 캐시만 사용)
-    const cachedData = (await this.redisService.get(cacheKey)) as string;
+    const cachedData = await this.redisService.get(cacheKey);
     if (cachedData) {
+      // 타입 체크: 문자열인 경우에만 파싱
+      const data =
+        typeof cachedData === 'string' ? JSON.parse(cachedData) : cachedData;
+
       // streamerIds가 제공된 경우 추가 필터링
       if (streamerIds && streamerIds.length > 0) {
-        const data = JSON.parse(cachedData);
         const filteredStreams = data.streamInfos.filter((stream) => {
           // 프로필 URL에서 스트리머 ID 추출 (마지막 부분)
           const streamerId = stream.profileUrl.split('/').pop() || '';
@@ -101,17 +104,22 @@ export class CrawlerService {
         };
       }
 
-      return JSON.parse(cachedData);
+      return data;
     }
 
     // 캐시가 없는 경우, 빈 결과 대신 기본 전체 캐시 확인
     if (crewId || (streamerIds && streamerIds.length > 0)) {
-      const globalCachedData = (await this.redisService.get(
+      const globalCachedData = await this.redisService.get(
         this.CACHE_ALL_STREAM_KEY,
-      )) as string;
+      );
 
       if (globalCachedData) {
-        const allData = JSON.parse(globalCachedData);
+        // 타입 체크: 문자열인 경우에만 파싱
+        const allData =
+          typeof globalCachedData === 'string'
+            ? JSON.parse(globalCachedData)
+            : globalCachedData;
+
         let filteredStreams = allData.streamInfos;
 
         // 크루 ID로 필터링
