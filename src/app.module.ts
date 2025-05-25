@@ -28,8 +28,6 @@ import { CrewRankModule } from './modules/crew-rank/crew-rank.module';
 import { CrewSignatureModule } from './modules/crew-signature/crew-signature.module';
 import { CrewModule } from './modules/crew/crew.module';
 import { UserPermissionModule } from './modules/user-permission/user-permission.module';
-import { ScheduleModule } from '@nestjs/schedule';
-import { LiveStreamModule } from 'src/modules/live-stream/live-stream.module';
 import { EventEmitterModule } from '@nestjs/event-emitter';
 import { StarCraftGameMatch } from 'src/entities/starcraft-game-match.entity';
 import { StarCraftMap } from 'src/entities/starcraft-map.entity';
@@ -72,7 +70,6 @@ import { EloRankingModule } from './modules/elo-ranking/elo-ranking.module';
         }
       })(),
     }),
-    ScheduleModule.forRoot(),
     EventEmitterModule.forRoot(),
     TypeOrmModule.forRoot({
       type: 'postgres',
@@ -138,7 +135,6 @@ import { EloRankingModule } from './modules/elo-ranking/elo-ranking.module';
     UserPermissionModule,
     BoardModule,
     LikesModule,
-    LiveStreamModule,
     StarCraftGameMatchModule,
     EditorModule,
     AwsModule,

@@ -1,5 +1,3 @@
-import { ActivityType } from '../../entities/user-activity.entity';
-
 export enum RankCategory {
   SOLDIER = 'SOLDIER', // 병
   NON_COMMISSIONED_OFFICER = 'NCO', // 부사관
