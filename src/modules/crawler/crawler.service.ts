@@ -951,7 +951,10 @@ export class CrawlerService {
         return { crews: [] };
       }
 
-      const allStreamData = JSON.parse(globalCachedData);
+      const allStreamData =
+        typeof globalCachedData === 'string'
+          ? JSON.parse(globalCachedData)
+          : globalCachedData;
       const allLiveStreams = allStreamData.streamInfos || [];
 
       // 모든 크루 정보 가져오기
