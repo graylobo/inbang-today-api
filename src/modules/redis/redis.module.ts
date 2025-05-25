@@ -2,8 +2,11 @@ import { CacheModule } from '@nestjs/cache-manager';
 import { Module } from '@nestjs/common';
 import { redisStore } from 'cache-manager-redis-store';
 import { RedisService } from 'src/modules/redis/redis.service';
+import { EventEmitterModule } from '@nestjs/event-emitter';
+
 @Module({
   imports: [
+    EventEmitterModule,
     CacheModule.register({
       store: (): any => {
         return redisStore({

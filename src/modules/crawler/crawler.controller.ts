@@ -25,9 +25,10 @@ export class CrawlerController {
     }
 
     // 기존 크루 ID 기반 처리
-    return this.crawlerService.getStreamingData({
+    const test = await this.crawlerService.getStreamingData({
       crewId: crewId ? parseInt(crewId) : undefined,
     });
+    return test;
   }
 
   @Get('live-crews')
@@ -49,15 +50,5 @@ export class CrawlerController {
   async updateAllStreamersSoopId() {
     await this.crawlerService.updateAllStreamersSoopId();
     return { message: '스트리머 정보 업데이트가 완료되었습니다.' };
-  }
-
-  /**
-   * 월간 ELO 포인트 크롤링 테스트용 엔드포인트
-   * 이 엔드포인트는 실제 운영 환경에서는 삭제하거나 권한 설정을 통해 보호해야 합니다.
-   */
-  @Get('test-elo-crawler')
-  async testEloCrawler() {
-    await this.crawlerService.crawlMonthlyEloPoints();
-    return { message: '월간 ELO 포인트 크롤링 테스트가 실행되었습니다.' };
   }
 }

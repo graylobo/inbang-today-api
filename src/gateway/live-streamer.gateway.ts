@@ -27,17 +27,17 @@ export class LiveStreamGateway
     console.log(`Client disconnected: ${client.id}`);
   }
 
-  // 전체 스트리머 방출
+  // 전체 스트리머 방출 (데이터가 포함된 경우)
   @SubscribeMessage('updateLiveStreamers')
-  @OnEvent(STREAM_EVENTS.UPDATE)
   updateClients(data: any[]): void {
     this.server.emit('updateLiveStreamers', data);
   }
 
-  // 스트리머 업데이트 알림
-  @SubscribeMessage('liveStreamersUpdated')
+  // Redis를 통한 업데이트 알림을 처리 (데이터 없이 이벤트만 받는 경우)
   @OnEvent(STREAM_EVENTS.UPDATE)
-  liveStreamersUpdated(): void {
+  async liveStreamersUpdated(): Promise<void> {
+    console.log('Received stream update event, notifying clients');
+    // Send notification to clients to fetch updated data
     this.server.emit('liveStreamersUpdated');
   }
 }

@@ -144,24 +144,8 @@ export class CrawlerService {
 
   async getMatchHistory(startDate: string, endDate: string) {
     try {
-      // const formData = new URLSearchParams({
-      //   wr_1: startDate,
-      //   wr_2: endDate,
-      // });
-
-      // const eloBoardUrl = 'https://eloboard.com/men/bbs/search_bj_list.php';
-
-      // const response = await firstValueFrom(
-      //   this.httpService.post(eloBoardUrl, formData.toString(), {
-      //     headers: {
-      //       'Content-Type': 'application/x-www-form-urlencoded',
-      //       'User-Agent':
-      //         'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-      //     },
-      //   }),
-      // );
-
-      // return response.data;
+      console.log(`Fetching match history from ${startDate} to ${endDate}`);
+      // Note: using direct request to eloboard instead of the commented-out form submission
       const eloBoardUrl =
         'https://eloboard.com/women/bbs/board.php?bo_table=bj_board&page=1';
 
