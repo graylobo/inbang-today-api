@@ -17,6 +17,24 @@ services:
     networks:
       - inbang-network
 
+  cron:
+    build:
+      context: ../inbang-today-cron
+      dockerfile: Dockerfile
+      args:
+        ENVIRONMENT: ${ENVIRONMENT}
+    container_name: inbang-today-cron
+    restart: always
+    ports:
+      - '4001:4001'
+    depends_on:
+      - postgres
+      - redis
+    env_file:
+      - .env.${ENVIRONMENT}
+    networks:
+      - inbang-network
+
   postgres:
     image: postgres:15-alpine
     container_name: inbang-postgres

@@ -1,6 +1,14 @@
-import { Controller, Get, Post, Put, Delete, Body, Param, HttpException, HttpStatus } from '@nestjs/common';
-import { CrewRankService } from './crew-rank.service';
+import {
+  Body,
+  Controller,
+  Delete,
+  Get,
+  Param,
+  Post,
+  Put,
+} from '@nestjs/common';
 import { CrewRank } from '../../entities/crew-rank.entity';
+import { CrewRankService } from './crew-rank.service';
 
 @Controller('crew-ranks')
 export class CrewRankController {
@@ -28,4 +36,4 @@ export class CrewRankController {
   async delete(@Param('id') id: string): Promise<void> {
     return this.crewRankService.delete(+id);
   }
-} 
+}
