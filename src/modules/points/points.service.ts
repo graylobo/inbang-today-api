@@ -10,6 +10,7 @@ import { ActivityType } from '../../entities/user-activity.entity';
 import { PurchasePointHistory } from '../../entities/purchase-point-history.entity';
 import {
   calculateLevelFromPoints,
+  calculateRequiredPoints,
   LEVEL_DEMOTION,
 } from '../../common/constants/rank.constants';
 import { ACTIVITY_POINTS } from 'src/common/constants/points.constants';
@@ -349,6 +350,23 @@ export class PointsService {
       await this.userLevelRepository.save(userLevel);
     }
 
+    // 현재 레벨과 다음 레벨을 위한 포인트 계산
+    const currentLevel = userLevel.level;
+    const nextLevel = currentLevel + 1;
+    const currentLevelPoints = calculateRequiredPoints(currentLevel);
+    const nextLevelPoints = calculateRequiredPoints(nextLevel);
+    const pointsNeeded = nextLevelPoints - currentLevelPoints;
+    const progress =
+      pointsNeeded > 0
+        ? Math.min(
+            100,
+            Math.round(
+              ((userLevel.activityPoints - currentLevelPoints) / pointsNeeded) *
+                100,
+            ),
+          )
+        : 100;
+
     return {
       level: userLevel.level,
       activityPoints: userLevel.activityPoints,
@@ -356,6 +374,11 @@ export class PointsService {
       lastActivityAt: userLevel.lastActivityAt,
       lastPointsReductionAt: userLevel.lastPointsReductionAt,
       levelHistory: userLevel.levelHistory,
+      // 추가 정보
+      nextLevel: nextLevel,
+      nextLevelPoints: nextLevelPoints,
+      pointsNeeded: Math.max(0, nextLevelPoints - userLevel.activityPoints),
+      progressPercent: progress,
     };
   }
 

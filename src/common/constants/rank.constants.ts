@@ -29,9 +29,16 @@ export const calculateRequiredPoints = (level: number): number => {
 export const calculateLevelFromPoints = (points: number): number => {
   if (points <= 0) return 0;
 
-  // Binary search to find the highest level that doesn't exceed the points
+  // 큰 포인트 값에서도 작동하도록 상한을 충분히 높게 설정
   let low = 0;
-  let high = 100; // Reasonable upper bound
+  let high = 1000; // 상한을 1000으로 늘림
+
+  // 빠른 초기 체크: 포인트가 매우 높은 경우
+  const estimatedLevel = Math.floor(Math.sqrt(points / 20));
+  if (estimatedLevel > high) {
+    low = high;
+    high = estimatedLevel * 2;
+  }
 
   while (low <= high) {
     const mid = Math.floor((low + high) / 2);

@@ -1,14 +1,14 @@
 import { ActivityType } from '../../entities/user-activity.entity';
 
 export const ACTIVITY_POINTS: Record<ActivityType, number> = {
-  [ActivityType.POST_CREATE]: 9999999,
-  [ActivityType.COMMENT_CREATE]: 1,
-  [ActivityType.POST_LIKE]: 1,
-  [ActivityType.COMMENT_LIKE]: 1,
-  [ActivityType.DAILY_LOGIN]: 1,
-  [ActivityType.PROFILE_COMPLETE]: 1,
-  [ActivityType.POST_SHARE]: 1,
-  [ActivityType.COMMENT_REPLY]: 1,
+  [ActivityType.POST_CREATE]: 2,
+  [ActivityType.COMMENT_CREATE]: 2,
+  [ActivityType.POST_LIKE]: 2,
+  [ActivityType.COMMENT_LIKE]: 2,
+  [ActivityType.DAILY_LOGIN]: 2,
+  [ActivityType.PROFILE_COMPLETE]: 2,
+  [ActivityType.POST_SHARE]: 2,
+  [ActivityType.COMMENT_REPLY]: 2,
   [ActivityType.POST_VIEW]: 0.5, // 조회수는 소수점으로 계산
   [ActivityType.BROADCAST_EARNING]: 2, // 방송 수익 등록 시 포인트
 };
