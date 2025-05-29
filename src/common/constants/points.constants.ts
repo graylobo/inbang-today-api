@@ -1,7 +1,7 @@
 import { ActivityType } from '../../entities/user-activity.entity';
 
 export const ACTIVITY_POINTS: Record<ActivityType, number> = {
-  [ActivityType.POST_CREATE]: 1,
+  [ActivityType.POST_CREATE]: 9999999,
   [ActivityType.COMMENT_CREATE]: 1,
   [ActivityType.POST_LIKE]: 1,
   [ActivityType.COMMENT_LIKE]: 1,

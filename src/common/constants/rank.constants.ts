@@ -1,118 +1,58 @@
-export enum RankCategory {
-  SOLDIER = 'SOLDIER', // 병
-  NON_COMMISSIONED_OFFICER = 'NCO', // 부사관
-  OFFICER = 'OFFICER', // 장교
-  GENERAL = 'GENERAL', // 장성
-}
+/**
+ * Level system constants
+ */
 
-export enum Rank {
-  // 병
-  PRIVATE_SECOND_CLASS = 'PRIVATE_SECOND_CLASS', // 이등병
-  PRIVATE_FIRST_CLASS = 'PRIVATE_FIRST_CLASS', // 일등병
-  CORPORAL = 'CORPORAL', // 상병
-  SERGEANT = 'SERGEANT', // 병장
+/**
+ * Calculates the required points for a given level
+ * @param level - The level to calculate points for
+ * @returns Required points for the level
+ */
+export const calculateRequiredPoints = (level: number): number => {
+  // Base points required for level 1
+  const basePoints = 100;
 
-  // 부사관
-  STAFF_SERGEANT = 'STAFF_SERGEANT', // 하사
-  SERGEANT_FIRST_CLASS = 'SERGEANT_FIRST_CLASS', // 중사
-  MASTER_SERGEANT = 'MASTER_SERGEANT', // 상사
-  SERGEANT_MAJOR = 'SERGEANT_MAJOR', // 원사
-
-  // 장교 (위관급)
-  SECOND_LIEUTENANT = 'SECOND_LIEUTENANT', // 소위
-  FIRST_LIEUTENANT = 'FIRST_LIEUTENANT', // 중위
-  CAPTAIN = 'CAPTAIN', // 대위
-  WARRANT_OFFICER = 'WARRANT_OFFICER', // 준위
-
-  // 장교 (영관급)
-  MAJOR = 'MAJOR', // 소령
-  LIEUTENANT_COLONEL = 'LIEUTENANT_COLONEL', // 중령
-  COLONEL = 'COLONEL', // 대령
-
-  // 장성
-  BRIGADIER_GENERAL = 'BRIGADIER_GENERAL', // 준장
-  MAJOR_GENERAL = 'MAJOR_GENERAL', // 소장
-  LIEUTENANT_GENERAL = 'LIEUTENANT_GENERAL', // 중장
-  GENERAL = 'GENERAL', // 대장
-}
-
-export const RANK_POINTS = {
-  [Rank.PRIVATE_SECOND_CLASS]: 0,
-  [Rank.PRIVATE_FIRST_CLASS]: 100,
-  [Rank.CORPORAL]: 300,
-  [Rank.SERGEANT]: 600,
-  [Rank.STAFF_SERGEANT]: 1000,
-  [Rank.SERGEANT_FIRST_CLASS]: 1500,
-  [Rank.MASTER_SERGEANT]: 2100,
-  [Rank.SERGEANT_MAJOR]: 2800,
-  [Rank.SECOND_LIEUTENANT]: 3600,
-  [Rank.FIRST_LIEUTENANT]: 4500,
-  [Rank.CAPTAIN]: 5500,
-  [Rank.WARRANT_OFFICER]: 6600,
-  [Rank.MAJOR]: 7800,
-  [Rank.LIEUTENANT_COLONEL]: 9100,
-  [Rank.COLONEL]: 10500,
-  [Rank.BRIGADIER_GENERAL]: 12000,
-  [Rank.MAJOR_GENERAL]: 13600,
-  [Rank.LIEUTENANT_GENERAL]: 15300,
-  [Rank.GENERAL]: 17100,
+  // Points increase with level - quadratic growth
+  // Level 0: 0 points
+  // Level 1: 100 points
+  // Level 2: 220 points
+  // Level 3: 360 points
+  // And so on...
+  if (level <= 0) return 0;
+  return basePoints * level + 20 * Math.pow(level, 2);
 };
 
-export const RANK_CATEGORIES = {
-  [RankCategory.SOLDIER]: [
-    Rank.PRIVATE_SECOND_CLASS,
-    Rank.PRIVATE_FIRST_CLASS,
-    Rank.CORPORAL,
-    Rank.SERGEANT,
-  ],
-  [RankCategory.NON_COMMISSIONED_OFFICER]: [
-    Rank.STAFF_SERGEANT,
-    Rank.SERGEANT_FIRST_CLASS,
-    Rank.MASTER_SERGEANT,
-    Rank.SERGEANT_MAJOR,
-  ],
-  [RankCategory.OFFICER]: [
-    Rank.SECOND_LIEUTENANT,
-    Rank.FIRST_LIEUTENANT,
-    Rank.CAPTAIN,
-    Rank.WARRANT_OFFICER,
-    Rank.MAJOR,
-    Rank.LIEUTENANT_COLONEL,
-    Rank.COLONEL,
-  ],
-  [RankCategory.GENERAL]: [
-    Rank.BRIGADIER_GENERAL,
-    Rank.MAJOR_GENERAL,
-    Rank.LIEUTENANT_GENERAL,
-    Rank.GENERAL,
-  ],
+/**
+ * Calculates the level based on points
+ * @param points - The current points
+ * @returns The level corresponding to the points
+ */
+export const calculateLevelFromPoints = (points: number): number => {
+  if (points <= 0) return 0;
+
+  // Binary search to find the highest level that doesn't exceed the points
+  let low = 0;
+  let high = 100; // Reasonable upper bound
+
+  while (low <= high) {
+    const mid = Math.floor((low + high) / 2);
+    const requiredPoints = calculateRequiredPoints(mid);
+    const nextLevelPoints = calculateRequiredPoints(mid + 1);
+
+    if (requiredPoints <= points && nextLevelPoints > points) {
+      return mid;
+    } else if (requiredPoints > points) {
+      high = mid - 1;
+    } else {
+      low = mid + 1;
+    }
+  }
+
+  return low;
 };
 
-// 계급 강등 관련 설정
-export const RANK_DEMOTION = {
-  INACTIVITY_PERIOD: 30, // 30일
-  POINTS_REDUCTION_AMOUNT: 100, // 30일마다 100점 감소
-  MINIMUM_POINTS: 0, // 최소 포인트
-};
-
-export const RANK_ORDER: Record<Rank, number> = {
-  [Rank.PRIVATE_SECOND_CLASS]: 0,
-  [Rank.PRIVATE_FIRST_CLASS]: 1,
-  [Rank.CORPORAL]: 2,
-  [Rank.SERGEANT]: 3,
-  [Rank.STAFF_SERGEANT]: 4,
-  [Rank.SERGEANT_FIRST_CLASS]: 5,
-  [Rank.MASTER_SERGEANT]: 6,
-  [Rank.SERGEANT_MAJOR]: 7,
-  [Rank.SECOND_LIEUTENANT]: 8,
-  [Rank.FIRST_LIEUTENANT]: 9,
-  [Rank.CAPTAIN]: 10,
-  [Rank.WARRANT_OFFICER]: 11,
-  [Rank.MAJOR]: 12,
-  [Rank.LIEUTENANT_COLONEL]: 13,
-  [Rank.COLONEL]: 14,
-  [Rank.BRIGADIER_GENERAL]: 15,
-  [Rank.MAJOR_GENERAL]: 16,
-  [Rank.LIEUTENANT_GENERAL]: 17,
-  [Rank.GENERAL]: 18,
+// Level demotion related settings
+export const LEVEL_DEMOTION = {
+  INACTIVITY_PERIOD: 30, // 30 days
+  POINTS_REDUCTION_AMOUNT: 100, // Reduce 100 points every 30 days
+  MINIMUM_POINTS: 0, // Minimum points
 };

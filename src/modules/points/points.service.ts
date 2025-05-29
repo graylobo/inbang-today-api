@@ -9,12 +9,8 @@ import { User } from '../../entities/user.entity';
 import { ActivityType } from '../../entities/user-activity.entity';
 import { PurchasePointHistory } from '../../entities/purchase-point-history.entity';
 import {
-  RANK_POINTS,
-  RANK_CATEGORIES,
-  RANK_DEMOTION,
-  RANK_ORDER,
-  Rank,
-  RankCategory,
+  calculateLevelFromPoints,
+  LEVEL_DEMOTION,
 } from '../../common/constants/rank.constants';
 import { ACTIVITY_POINTS } from 'src/common/constants/points.constants';
 
@@ -96,13 +92,12 @@ export class PointsService {
     if (!userLevel) {
       userLevel = this.userLevelRepository.create({
         user: { id: userId },
-        rank: Rank.PRIVATE_SECOND_CLASS,
-        rankCategory: RankCategory.SOLDIER,
+        level: 0,
         activityPoints: 0,
         purchasePoints: 0,
         lastActivityAt: new Date(),
         lastPointsReductionAt: new Date(),
-        rankHistory: [],
+        levelHistory: [],
       });
     }
 
@@ -112,8 +107,8 @@ export class PointsService {
     // 활동 포인트 업데이트
     userLevel.activityPoints += points;
 
-    // 계급 체크 (활동 포인트 기준)
-    await this.checkRank(userLevel);
+    // 레벨 체크 (활동 포인트 기준)
+    await this.checkLevel(userLevel);
 
     await this.userLevelRepository.save(userLevel);
   }
@@ -130,57 +125,39 @@ export class PointsService {
     if (!userLevel) {
       userLevel = manager.create(UserLevel, {
         user: { id: userId },
-        rank: Rank.PRIVATE_SECOND_CLASS,
-        rankCategory: RankCategory.SOLDIER,
+        level: 0,
         activityPoints: 0,
         purchasePoints: 0,
         lastActivityAt: new Date(),
         lastPointsReductionAt: new Date(),
-        rankHistory: [],
+        levelHistory: [],
       });
     }
 
     userLevel.lastActivityAt = new Date();
     userLevel.activityPoints += points;
-    await this.checkRank(userLevel);
+    await this.checkLevel(userLevel);
     await manager.save(UserLevel, userLevel);
   }
 
-  private async checkRank(userLevel: UserLevel) {
-    const currentRank = userLevel.rank;
+  private async checkLevel(userLevel: UserLevel) {
+    const currentLevel = userLevel.level;
     const currentPoints = userLevel.activityPoints;
 
-    // 현재 포인트에 맞는 계급 찾기
-    let newRank = currentRank;
-    for (const [rank, requiredPoints] of Object.entries(RANK_POINTS)) {
-      if (currentPoints >= requiredPoints) {
-        newRank = rank as Rank;
-      } else {
-        break;
-      }
-    }
+    // 현재 포인트에 맞는 레벨 계산
+    const newLevel = calculateLevelFromPoints(currentPoints);
 
-    // 계급이 변경된 경우
-    if (newRank !== currentRank) {
-      // 계급 카테고리 업데이트
-      let newCategory = userLevel.rankCategory;
-      for (const [category, ranks] of Object.entries(RANK_CATEGORIES)) {
-        if (ranks.includes(newRank)) {
-          newCategory = category as RankCategory;
-          break;
-        }
-      }
-
-      // 계급 이력 추가
-      userLevel.rankHistory = userLevel.rankHistory || [];
-      userLevel.rankHistory.push({
-        rank: newRank,
+    // 레벨이 변경된 경우
+    if (newLevel !== currentLevel) {
+      // 레벨 이력 추가
+      userLevel.levelHistory = userLevel.levelHistory || [];
+      userLevel.levelHistory.push({
+        level: newLevel,
         date: new Date(),
-        reason: '포인트 획득으로 인한 계급 상승',
+        reason: '포인트 획득으로 인한 레벨 상승',
       });
 
-      userLevel.rank = newRank;
-      userLevel.rankCategory = newCategory;
+      userLevel.level = newLevel;
     }
   }
 
@@ -189,7 +166,7 @@ export class PointsService {
       .createQueryBuilder('userLevel')
       .where('userLevel.lastActivityAt < :date', {
         date: new Date(
-          Date.now() - RANK_DEMOTION.INACTIVITY_PERIOD * 24 * 60 * 60 * 1000,
+          Date.now() - LEVEL_DEMOTION.INACTIVITY_PERIOD * 24 * 60 * 60 * 1000,
         ),
       })
       .getMany();
@@ -202,29 +179,29 @@ export class PointsService {
       );
 
       // 30일이 지났는지 확인
-      if (daysSinceLastReduction >= RANK_DEMOTION.INACTIVITY_PERIOD) {
+      if (daysSinceLastReduction >= LEVEL_DEMOTION.INACTIVITY_PERIOD) {
         const reductionCount = Math.floor(
-          daysSinceLastReduction / RANK_DEMOTION.INACTIVITY_PERIOD,
+          daysSinceLastReduction / LEVEL_DEMOTION.INACTIVITY_PERIOD,
         );
         const pointsToDeduct =
-          reductionCount * RANK_DEMOTION.POINTS_REDUCTION_AMOUNT;
+          reductionCount * LEVEL_DEMOTION.POINTS_REDUCTION_AMOUNT;
 
         userLevel.activityPoints = Math.max(
-          RANK_DEMOTION.MINIMUM_POINTS,
+          LEVEL_DEMOTION.MINIMUM_POINTS,
           userLevel.activityPoints - pointsToDeduct,
         );
 
         // 마지막 포인트 감소일 업데이트
         userLevel.lastPointsReductionAt = new Date();
 
-        // 계급 체크
-        await this.checkRank(userLevel);
+        // 레벨 체크
+        await this.checkLevel(userLevel);
 
-        // 계급 이력 추가
-        userLevel.rankHistory.push({
-          rank: userLevel.rank,
+        // 레벨 이력 추가
+        userLevel.levelHistory.push({
+          level: userLevel.level,
           date: new Date(),
-          reason: '활동 부족으로 인한 계급 조정',
+          reason: '활동 부족으로 인한 레벨 조정',
         });
 
         await this.userLevelRepository.save(userLevel);
@@ -248,37 +225,45 @@ export class PointsService {
       .where(`badge.requirements->>'activityType' = :activityType`, {
         activityType,
       })
+      .orWhere(`badge.requirements->>'level' IS NOT NULL`)
+      .orWhere(`badge.requirements->>'points' IS NOT NULL`)
       .getMany();
 
     for (const badge of potentialBadges) {
-      const requirements = badge.requirements;
-      const hasBadge = await this.userBadgeRepository.findOne({
-        where: {
-          user: { id: userId },
-          badge: { id: badge.id },
-        },
+      const {
+        activityType: reqActivityType,
+        count,
+        level,
+        points,
+      } = badge.requirements;
+
+      // 이미 획득한 배지인지 확인
+      const existingUserBadge = await this.userBadgeRepository.findOne({
+        where: { user: { id: userId }, badge: { id: badge.id } },
       });
 
-      if (!hasBadge) {
-        if (
-          (requirements.count && activityCount >= requirements.count) ||
-          (requirements.level &&
-            RANK_ORDER[userLevel.rank] >= requirements.level) ||
-          (requirements.points &&
-            userLevel.activityPoints >= requirements.points)
-        ) {
-          // 배지 획득
-          const userBadge = this.userBadgeRepository.create({
-            user: { id: userId },
-            badge: { id: badge.id },
-            earnedAt: new Date(),
-            progress: {
-              current: activityCount,
-              target: requirements.count || 0,
-            },
-          });
-          await this.userBadgeRepository.save(userBadge);
-        }
+      if (existingUserBadge) continue;
+
+      // 조건 만족 여부 확인
+      const meetsRequirements =
+        (!reqActivityType || reqActivityType === activityType) &&
+        (!count || activityCount >= count) &&
+        (!level || userLevel.level >= level) &&
+        (!points || userLevel.activityPoints >= points);
+
+      if (meetsRequirements) {
+        // 배지 획득
+        const userBadge = this.userBadgeRepository.create({
+          user: { id: userId },
+          badge: { id: badge.id },
+          earnedAt: new Date(),
+          progress: {
+            current: reqActivityType ? activityCount : userLevel.activityPoints,
+            target: reqActivityType ? count : points,
+          },
+        });
+
+        await this.userBadgeRepository.save(userBadge);
       }
     }
   }
@@ -297,41 +282,51 @@ export class PointsService {
       where: { user: { id: userId } },
     });
 
+    // 해당 활동과 관련된 배지들 조회
     const potentialBadges = await manager
       .createQueryBuilder(Badge, 'badge')
       .where(`badge.requirements->>'activityType' = :activityType`, {
         activityType,
       })
+      .orWhere(`badge.requirements->>'level' IS NOT NULL`)
+      .orWhere(`badge.requirements->>'points' IS NOT NULL`)
       .getMany();
 
     for (const badge of potentialBadges) {
-      const requirements = badge.requirements;
-      const hasBadge = await manager.findOne(UserBadge, {
-        where: {
-          user: { id: userId },
-          badge: { id: badge.id },
-        },
+      const {
+        activityType: reqActivityType,
+        count,
+        level,
+        points,
+      } = badge.requirements;
+
+      // 이미 획득한 배지인지 확인
+      const existingUserBadge = await manager.findOne(UserBadge, {
+        where: { user: { id: userId }, badge: { id: badge.id } },
       });
 
-      if (!hasBadge) {
-        if (
-          (requirements.count && activityCount >= requirements.count) ||
-          (requirements.level &&
-            RANK_ORDER[userLevel.rank] >= requirements.level) ||
-          (requirements.points &&
-            userLevel.activityPoints >= requirements.points)
-        ) {
-          const userBadge = manager.create(UserBadge, {
-            user: { id: userId },
-            badge: { id: badge.id },
-            earnedAt: new Date(),
-            progress: {
-              current: activityCount,
-              target: requirements.count || 0,
-            },
-          });
-          await manager.save(UserBadge, userBadge);
-        }
+      if (existingUserBadge) continue;
+
+      // 조건 만족 여부 확인
+      const meetsRequirements =
+        (!reqActivityType || reqActivityType === activityType) &&
+        (!count || activityCount >= count) &&
+        (!level || userLevel.level >= level) &&
+        (!points || userLevel.activityPoints >= points);
+
+      if (meetsRequirements) {
+        // 배지 획득
+        const userBadge = manager.create(UserBadge, {
+          user: { id: userId },
+          badge: { id: badge.id },
+          earnedAt: new Date(),
+          progress: {
+            current: reqActivityType ? activityCount : userLevel.activityPoints,
+            target: reqActivityType ? count : points,
+          },
+        });
+
+        await manager.save(UserBadge, userBadge);
       }
     }
   }
@@ -344,25 +339,23 @@ export class PointsService {
     if (!userLevel) {
       userLevel = this.userLevelRepository.create({
         user: { id: userId },
-        rank: Rank.PRIVATE_SECOND_CLASS,
-        rankCategory: RankCategory.SOLDIER,
+        level: 0,
         activityPoints: 0,
         purchasePoints: 0,
         lastActivityAt: new Date(),
         lastPointsReductionAt: new Date(),
-        rankHistory: [],
+        levelHistory: [],
       });
       await this.userLevelRepository.save(userLevel);
     }
 
     return {
-      rank: userLevel.rank,
-      rankCategory: userLevel.rankCategory,
+      level: userLevel.level,
       activityPoints: userLevel.activityPoints,
       purchasePoints: userLevel.purchasePoints,
       lastActivityAt: userLevel.lastActivityAt,
       lastPointsReductionAt: userLevel.lastPointsReductionAt,
-      rankHistory: userLevel.rankHistory,
+      levelHistory: userLevel.levelHistory,
     };
   }
 
