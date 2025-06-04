@@ -13,6 +13,9 @@ import { BaseEntity } from 'src/entities/base.entity';
 import { PostLike } from './post-like.entity';
 
 @Entity()
+@Index('IDX_POST_BOARD_CREATED_AT', ['board', 'createdAt'])
+@Index('IDX_POST_BOARD_VIEW_COUNT', ['board', 'viewCount'])
+@Index('IDX_POST_CREATED_AT', ['createdAt'])
 export class Post extends BaseEntity {
   @PrimaryGeneratedColumn()
   id: number;
