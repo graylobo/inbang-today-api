@@ -35,18 +35,91 @@ export class PostService {
       orderKey = 'createdAt',
     } = query;
 
-    const [items, total] = await this.postRepository.findAndCount({
-      where: { board: { id: boardId } },
-      relations: ['author', 'comments'],
-      order: { [orderKey]: order },
-      take: perPage,
-      skip: (page - 1) * perPage,
-    });
+    // 쿼리 최적화: 서브쿼리를 사용하여 댓글 개수를 효율적으로 가져오기
+    const queryBuilder = this.postRepository
+      .createQueryBuilder('post')
+      .leftJoinAndSelect('post.author', 'author')
+      .addSelect((subQuery) => {
+        return subQuery
+          .select('COUNT(*)', 'count')
+          .from('comment', 'comment')
+          .where('comment.postId = post.id');
+      }, 'commentCount')
+      .where('post.boardId = :boardId', { boardId })
+      .orderBy(`post.${orderKey}`, order.toUpperCase() as 'ASC' | 'DESC')
+      .skip((page - 1) * perPage)
+      .take(perPage);
+
+    const [items, total] = await Promise.all([
+      queryBuilder.getRawAndEntities(),
+      this.postRepository.count({ where: { board: { id: boardId } } }),
+    ]);
+
+    // 댓글 수를 포함한 게시글 데이터 구성
+    const postsWithCommentCounts = items.entities.map((post, index) => ({
+      ...post,
+      comments: new Array(parseInt(items.raw[index].commentCount) || 0).fill({
+        id: 0,
+      }),
+    }));
 
     return new PaginatedResponse({
-      items,
+      items: postsWithCommentCounts,
       total,
       totalPages: Math.ceil(total / perPage),
+      page,
+      perPage,
+    });
+  }
+
+  async findAllBySlug(
+    slug: string,
+    query: PaginationQueryDto,
+  ): Promise<PaginatedResponse<Post>> {
+    const {
+      page = 1,
+      perPage = 3,
+      order = Order.DESC,
+      orderKey = 'createdAt',
+    } = query;
+
+    // 쿼리 최적화: 서브쿼리를 사용하여 댓글 개수를 효율적으로 가져오기
+    const queryBuilder = this.postRepository
+      .createQueryBuilder('post')
+      .leftJoinAndSelect('post.author', 'author')
+      .leftJoin('post.board', 'board')
+      .addSelect((subQuery) => {
+        return subQuery
+          .select('COUNT(*)', 'count')
+          .from('comment', 'comment')
+          .where('comment.postId = post.id');
+      }, 'commentCount')
+      .where('board.slug = :slug', { slug })
+      .orderBy(`post.${orderKey}`, order.toUpperCase() as 'ASC' | 'DESC')
+      .skip((page - 1) * perPage)
+      .take(perPage);
+
+    const [items, totalCount] = await Promise.all([
+      queryBuilder.getRawAndEntities(),
+      this.postRepository
+        .createQueryBuilder('post')
+        .leftJoin('post.board', 'board')
+        .where('board.slug = :slug', { slug })
+        .getCount(),
+    ]);
+
+    // 댓글 수를 포함한 게시글 데이터 구성
+    const postsWithCommentCounts = items.entities.map((post, index) => ({
+      ...post,
+      comments: new Array(parseInt(items.raw[index].commentCount) || 0).fill({
+        id: 0,
+      }),
+    }));
+
+    return new PaginatedResponse({
+      items: postsWithCommentCounts,
+      total: totalCount,
+      totalPages: Math.ceil(totalCount / perPage),
       page,
       perPage,
     });

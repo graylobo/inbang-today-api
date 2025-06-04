@@ -34,6 +34,14 @@ export class PostController {
     return this.postService.findAll(+boardId, query);
   }
 
+  @Get('board/slug/:slug')
+  async findAllBySlug(
+    @Param('slug') slug: string,
+    @Query() query: PaginationQueryDto,
+  ) {
+    return this.postService.findAllBySlug(slug, query);
+  }
+
   @Get(':id')
   async findById(@Param('id') id: string) {
     return this.postService.findById(+id);
