@@ -138,14 +138,6 @@ export class UserController {
     )
     file: Express.Multer.File,
   ) {
-    try {
-      return await this.userService.updateProfileImage(user.userId, file);
-    } catch (error) {
-      console.error('Upload profile image error:', error);
-      return {
-        success: false,
-        message: error.message,
-      };
-    }
+    return await this.userService.updateProfileImage(user.userId, file);
   }
 }
