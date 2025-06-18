@@ -12,7 +12,6 @@ import {
   StarCraftGameMatch,
 } from 'src/entities/starcraft-game-match.entity';
 import { StarCraftMap } from 'src/entities/starcraft-map.entity';
-import { StreamerEloRecord } from 'src/entities/streamer-elo-record.entity';
 import { Streamer } from 'src/entities/streamer.entity';
 import {
   StarCraftRace,
@@ -52,7 +51,6 @@ export class CrawlerService {
     private readonly starCraftGameMatchRepository: Repository<StarCraftGameMatch>,
     @InjectRepository(Category)
     private readonly categoryRepository: Repository<Category>,
-    @InjectRepository(StreamerEloRecord)
     private readonly streamerCategoryService: StreamerCategoryService,
     private readonly redisService: RedisService,
     private readonly httpService: HttpService,

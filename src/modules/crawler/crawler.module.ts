@@ -23,7 +23,6 @@ import { Crew } from 'src/entities/crew.entity';
       Category,
       StreamerCategory,
       Crew,
-      StreamerEloRecord,
     ]),
     RedisModule,
     HttpModule,
