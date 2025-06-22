@@ -30,25 +30,37 @@ export class PostService {
   ): Promise<PaginatedResponse<Post>> {
     const {
       page = 1,
-      perPage = 3,
+      perPage = 30,
       order = Order.DESC,
       orderKey = 'createdAt',
     } = query;
 
-    // 쿼리 최적화: 서브쿼리를 사용하여 댓글 개수를 효율적으로 가져오기
+    // 성능 최적화: LEFT JOIN을 사용하여 댓글 수를 효율적으로 계산
     const queryBuilder = this.postRepository
       .createQueryBuilder('post')
       .leftJoinAndSelect('post.author', 'author')
-      .addSelect((subQuery) => {
-        return subQuery
-          .select('COUNT(*)', 'count')
-          .from('comment', 'comment')
-          .where('comment.postId = post.id');
-      }, 'commentCount')
+      .leftJoin(
+        'comment',
+        'comment',
+        'comment.postId = post.id AND comment.deletedAt IS NULL',
+      )
+      .select([
+        'post.id',
+        'post.title',
+        'post.authorName',
+        'post.ipAddress',
+        'post.createdAt',
+        'post.viewCount',
+        'author.id',
+        'author.name',
+        'author.profileImage',
+      ])
+      .addSelect('COUNT(comment.id)', 'commentCount')
       .where('post.boardId = :boardId', { boardId })
+      .groupBy('post.id, author.id')
       .orderBy(`post.${orderKey}`, order.toUpperCase() as 'ASC' | 'DESC')
-      .skip((page - 1) * perPage)
-      .take(perPage);
+      .offset((page - 1) * perPage)
+      .limit(perPage);
 
     const [items, total] = await Promise.all([
       queryBuilder.getRawAndEntities(),
@@ -56,15 +68,16 @@ export class PostService {
     ]);
 
     // 댓글 수를 포함한 게시글 데이터 구성
-    const postsWithCommentCounts = items.entities.map((post, index) => ({
-      ...post,
-      comments: new Array(parseInt(items.raw[index].commentCount) || 0).fill({
-        id: 0,
-      }),
-    }));
+    const postsWithComments = items.entities.map((post, index) => {
+      const commentCount = parseInt(items.raw[index].commentCount) || 0;
+      return {
+        ...post,
+        comments: new Array(commentCount).fill({ id: 0 }), // UI 호환성을 위한 배열
+      };
+    });
 
     return new PaginatedResponse({
-      items: postsWithCommentCounts,
+      items: postsWithComments,
       total,
       totalPages: Math.ceil(total / perPage),
       page,
@@ -78,26 +91,38 @@ export class PostService {
   ): Promise<PaginatedResponse<Post>> {
     const {
       page = 1,
-      perPage = 3,
+      perPage = 30,
       order = Order.DESC,
       orderKey = 'createdAt',
     } = query;
 
-    // 쿼리 최적화: 서브쿼리를 사용하여 댓글 개수를 효율적으로 가져오기
+    // 성능 최적화: LEFT JOIN을 사용하여 댓글 수를 효율적으로 계산
     const queryBuilder = this.postRepository
       .createQueryBuilder('post')
       .leftJoinAndSelect('post.author', 'author')
       .leftJoin('post.board', 'board')
-      .addSelect((subQuery) => {
-        return subQuery
-          .select('COUNT(*)', 'count')
-          .from('comment', 'comment')
-          .where('comment.postId = post.id');
-      }, 'commentCount')
+      .leftJoin(
+        'comment',
+        'comment',
+        'comment.postId = post.id AND comment.deletedAt IS NULL',
+      )
+      .select([
+        'post.id',
+        'post.title',
+        'post.authorName',
+        'post.ipAddress',
+        'post.createdAt',
+        'post.viewCount',
+        'author.id',
+        'author.name',
+        'author.profileImage',
+      ])
+      .addSelect('COUNT(comment.id)', 'commentCount')
       .where('board.slug = :slug', { slug })
+      .groupBy('post.id, author.id')
       .orderBy(`post.${orderKey}`, order.toUpperCase() as 'ASC' | 'DESC')
-      .skip((page - 1) * perPage)
-      .take(perPage);
+      .offset((page - 1) * perPage)
+      .limit(perPage);
 
     const [items, totalCount] = await Promise.all([
       queryBuilder.getRawAndEntities(),
@@ -109,15 +134,16 @@ export class PostService {
     ]);
 
     // 댓글 수를 포함한 게시글 데이터 구성
-    const postsWithCommentCounts = items.entities.map((post, index) => ({
-      ...post,
-      comments: new Array(parseInt(items.raw[index].commentCount) || 0).fill({
-        id: 0,
-      }),
-    }));
+    const postsWithComments = items.entities.map((post, index) => {
+      const commentCount = parseInt(items.raw[index].commentCount) || 0;
+      return {
+        ...post,
+        comments: new Array(commentCount).fill({ id: 0 }), // UI 호환성을 위한 배열
+      };
+    });
 
     return new PaginatedResponse({
-      items: postsWithCommentCounts,
+      items: postsWithComments,
       total: totalCount,
       totalPages: Math.ceil(totalCount / perPage),
       page,
@@ -128,21 +154,17 @@ export class PostService {
   async findById(id: number): Promise<Post> {
     const post = await this.postRepository.findOne({
       where: { id },
-      relations: [
-        'author',
-        'board',
-        'comments',
-        'comments.author',
-        'comments.replies',
-      ],
+      relations: ['author', 'board'],
     });
 
     if (!post) {
       throw new NotFoundException('게시글을 찾을 수 없습니다.');
     }
 
-    // 조회수 업데이트를 즉시 실행하고 결과를 기다림
-    await this.postRepository.increment({ id }, 'viewCount', 1);
+    // 조회수 업데이트를 비동기로 실행 (응답 속도 개선)
+    this.postRepository
+      .increment({ id }, 'viewCount', 1)
+      .catch((err) => console.error('Failed to increment view count:', err));
     post.viewCount += 1; // 현재 객체도 업데이트
 
     return post;

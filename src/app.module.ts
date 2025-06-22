@@ -78,13 +78,20 @@ import { EloRankingModule } from './modules/elo-ranking/elo-ranking.module';
       username: process.env.DB_USERNAME,
       password: process.env.DB_PASSWORD,
       database: process.env.DB_NAME,
+      // 연결 풀 설정 추가 (성능 최적화)
+      extra: {
+        connectionLimit: 20, // 최대 연결 수
+        acquireTimeout: 30000, // 연결 획득 타임아웃 (30초)
+        timeout: 30000, // 쿼리 타임아웃 (30초)
+        ...(process.env.NODE_ENV === 'production' &&
+          process.env.DISABLE_SSL !== 'true' && {
+            ssl: { rejectUnauthorized: false },
+          }),
+      },
       ...(process.env.NODE_ENV === 'production' &&
         process.env.DISABLE_SSL !== 'true' && {
           ssl: {
             ca: 'global-bundle.pem',
-          },
-          extra: {
-            ssl: { rejectUnauthorized: false },
           },
         }),
       entities: [
@@ -115,8 +122,7 @@ import { EloRankingModule } from './modules/elo-ranking/elo-ranking.module';
         CrewMemberHistory,
         StreamerEloRecord,
       ],
-      synchronize: true,
-      // logging: true, // SQL 쿼리 로깅 활성화
+      synchronize: process.env.NODE_ENV !== 'production', // 운영에서는 false
     }),
     BullModule.forRoot({
       connection: {
