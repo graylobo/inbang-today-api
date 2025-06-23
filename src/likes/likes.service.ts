@@ -26,8 +26,8 @@ interface PendingLikeAction {
 export class LikesService {
   // 배치 처리를 위한 메모리 저장소
   private pendingLikes: Map<string, PendingLikeAction> = new Map();
-  // 배치 처리 간격 (밀리초)
-  private readonly BATCH_INTERVAL = 5000; // 5초
+  // 배치 처리 간격 (밀리초) - 1초로 단축
+  private readonly BATCH_INTERVAL = 1000; // 1초
   // 배치 처리가 예약되었는지 추적
   private batchScheduled = false;
 
@@ -42,8 +42,8 @@ export class LikesService {
     private commentLikeRepository: Repository<CommentLike>,
   ) {}
 
-  // 5초마다 배치 처리 실행
-  @Interval(5000)
+  // 1초마다 배치 처리 실행 (성능 개선)
+  @Interval(1000)
   async processBatch() {
     if (this.pendingLikes.size === 0) return;
 
@@ -54,40 +54,20 @@ export class LikesService {
     // 배치 초기화
     this.pendingLikes.clear();
 
-    // 액션 별로 그룹화하여 처리
-    const postLikes = batch.filter(
-      (item) => item.type === 'post' && item.action === 'like',
-    );
-    const postUnlikes = batch.filter(
-      (item) => item.type === 'post' && item.action === 'unlike',
-    );
-    const postDislikes = batch.filter(
-      (item) => item.type === 'post' && item.action === 'dislike',
-    );
-    const postUndislikes = batch.filter(
-      (item) => item.type === 'post' && item.action === 'undislike',
-    );
+    // 배치를 더 작은 청크로 나누어 병렬 처리
+    const chunkSize = 10;
+    const chunks = [];
+    for (let i = 0; i < batch.length; i += chunkSize) {
+      chunks.push(batch.slice(i, i + chunkSize));
+    }
 
-    const commentLikes = batch.filter(
-      (item) => item.type === 'comment' && item.action === 'like',
-    );
-    const commentUnlikes = batch.filter(
-      (item) => item.type === 'comment' && item.action === 'unlike',
-    );
+    // 각 청크를 병렬로 처리
+    await Promise.all(chunks.map((chunk) => this.processChunk(chunk)));
+  }
 
-    console.log(
-      `Batch details: ${postLikes.length} likes, ${postUnlikes.length} unlikes, ${postDislikes.length} dislikes, ${postUndislikes.length} undislikes`,
-    );
-
-    // 각 그룹별로 큐에 작업 추가
-    for (const item of [
-      ...postLikes,
-      ...postUnlikes,
-      ...postDislikes,
-      ...postUndislikes,
-      ...commentLikes,
-      ...commentUnlikes,
-    ]) {
+  // 청크 단위로 병렬 처리
+  private async processChunk(chunk: PendingLikeAction[]) {
+    const jobs = chunk.map((item) => {
       const actionType = item.action.startsWith('un')
         ? item.action.substring(2)
         : item.action;
@@ -98,7 +78,7 @@ export class LikesService {
         `Adding job to queue: ${actionType} (removal: ${isRemoval}) for ${item.type}:${item.targetId}, user:${item.userId || item.ipAddress}`,
       );
 
-      await this.likesQueue.add(
+      return this.likesQueue.add(
         'processLike',
         {
           userId: item.userId,
@@ -111,9 +91,13 @@ export class LikesService {
         {
           // 같은 항목이 중복 처리되지 않도록 jobId 설정
           jobId: `${item.type}:${item.targetId}:${item.userId || item.ipAddress}:${item.action}`,
+          // 작업 우선순위 설정 (더 최근 것이 높은 우선순위)
+          priority: item.timestamp,
         },
       );
-    }
+    });
+
+    await Promise.all(jobs);
   }
 
   // 좋아요 액션을 배치 큐에 추가
@@ -142,7 +126,7 @@ export class LikesService {
     console.log(`Current batch size: ${this.pendingLikes.size}`);
   }
 
-  // 포스트 좋아요 상태 토글 - 배치 대신 직접 처리 방식으로 변경
+  // 포스트 좋아요 상태 토글 - Redis 우선 접근으로 최적화
   async togglePostLike(
     postId: number,
     action: 'like' | 'dislike',
@@ -150,7 +134,7 @@ export class LikesService {
     ipAddress?: string,
   ) {
     console.log(
-      `[DIRECT] togglePostLike - postId: ${postId}, action: ${action}, userId: ${userId}, ip: ${ipAddress}`,
+      `[OPTIMIZED] togglePostLike - postId: ${postId}, action: ${action}, userId: ${userId}, ip: ${ipAddress}`,
     );
 
     // 인증된 사용자나 IP 주소가 없으면 에러
@@ -159,309 +143,237 @@ export class LikesService {
     }
 
     try {
-      // 1. 현재 상태 확인 - 이미 좋아요/싫어요 레코드가 있는지 확인
-      const existingLike = await this.postLikeRepository.findOne({
-        where: {
-          post: { id: postId },
-          ...(userId ? { user: { id: userId } } : { ipAddress }),
-        },
+      // Redis 캐시 키 생성
+      const userLikeKey = userId
+        ? REDIS_LIKE_KEY.USER_POST_LIKE(userId, postId)
+        : `ip:${ipAddress}:post:${postId}:like`;
+      const userDislikeKey = userId
+        ? REDIS_LIKE_KEY.USER_POST_DISLIKE(userId, postId)
+        : `ip:${ipAddress}:post:${postId}:dislike`;
+      const likeCountKey = REDIS_LIKE_KEY.POST_LIKES(postId);
+      const dislikeCountKey = REDIS_LIKE_KEY.POST_DISLIKES(postId);
+
+      // 현재 상태를 Redis에서 확인하고 필요시 캐시 초기화
+      const [hasLiked, hasDisliked, cacheData] = await Promise.all([
+        this.cacheManager.get<string>(userLikeKey),
+        this.cacheManager.get<string>(userDislikeKey),
+        this.ensureCacheInitialized(postId),
+      ]);
+
+      const isCurrentlyLiked = hasLiked === '1';
+      const isCurrentlyDisliked = hasDisliked === '1';
+      let likes = cacheData.likes;
+      let dislikes = cacheData.dislikes;
+
+      console.log(
+        `[OPTIMIZED] Current state - liked: ${isCurrentlyLiked}, disliked: ${isCurrentlyDisliked}, likes: ${likes}, dislikes: ${dislikes}`,
+      );
+
+      // Redis 파이프라인을 활용한 성능 최적화
+      let newLiked = false;
+      let newDisliked = false;
+      let batchAction: 'like' | 'unlike' | 'dislike' | 'undislike';
+      const pipeline = [];
+
+      if (action === 'like') {
+        if (isCurrentlyLiked) {
+          // 이미 좋아요 상태 → 좋아요 취소
+          newLiked = false;
+          newDisliked = false;
+          likes = Math.max(0, likes - 1);
+          batchAction = 'unlike';
+          pipeline.push(this.cacheManager.del(userLikeKey));
+        } else if (isCurrentlyDisliked) {
+          // 싫어요 상태 → 좋아요로 변경
+          newLiked = true;
+          newDisliked = false;
+          likes = likes + 1;
+          dislikes = Math.max(0, dislikes - 1);
+          batchAction = 'like';
+          pipeline.push(
+            this.cacheManager.set(userLikeKey, '1'),
+            this.cacheManager.del(userDislikeKey),
+          );
+        } else {
+          // 중립 상태 → 좋아요
+          newLiked = true;
+          newDisliked = false;
+          likes = likes + 1;
+          batchAction = 'like';
+          pipeline.push(this.cacheManager.set(userLikeKey, '1'));
+        }
+      } else if (action === 'dislike') {
+        if (isCurrentlyDisliked) {
+          // 이미 싫어요 상태 → 싫어요 취소
+          newLiked = false;
+          newDisliked = false;
+          dislikes = Math.max(0, dislikes - 1);
+          batchAction = 'undislike';
+          pipeline.push(this.cacheManager.del(userDislikeKey));
+        } else if (isCurrentlyLiked) {
+          // 좋아요 상태 → 싫어요로 변경
+          newLiked = false;
+          newDisliked = true;
+          likes = Math.max(0, likes - 1);
+          dislikes = dislikes + 1;
+          batchAction = 'dislike';
+          pipeline.push(
+            this.cacheManager.del(userLikeKey),
+            this.cacheManager.set(userDislikeKey, '1'),
+          );
+        } else {
+          // 중립 상태 → 싫어요
+          newLiked = false;
+          newDisliked = true;
+          dislikes = dislikes + 1;
+          batchAction = 'dislike';
+          pipeline.push(this.cacheManager.set(userDislikeKey, '1'));
+        }
+      } else {
+        throw new Error(`Invalid action: ${action}`);
+      }
+
+      // 카운트 캐시 업데이트를 파이프라인에 추가
+      pipeline.push(
+        this.cacheManager.set(likeCountKey, likes),
+        this.cacheManager.set(dislikeCountKey, dislikes),
+      );
+
+      // 모든 Redis 작업을 병렬로 실행
+      await Promise.all(pipeline);
+
+      // 배치 처리를 위해 액션 추가 (비동기)
+      setImmediate(() => {
+        this.addToBatch({
+          userId,
+          ipAddress,
+          targetId: postId,
+          action: batchAction,
+          type: 'post',
+          timestamp: Date.now(),
+        });
       });
 
       console.log(
-        `[DIRECT] Existing like record:`,
-        existingLike
-          ? `Found (isDislike: ${existingLike.isDislike})`
-          : 'Not found',
+        `[OPTIMIZED] Updated state - liked: ${newLiked}, disliked: ${newDisliked}, likes: ${likes}, dislikes: ${dislikes}`,
       );
 
-      const post = await this.postRepository.findOne({ where: { id: postId } });
-      if (!post) {
-        throw new Error('Post not found');
-      }
-
-      // 2. 액션에 따른 처리
-      if (action === 'like') {
-        // 좋아요 처리
-        if (!existingLike) {
-          // 처음 좋아요 누르는 경우 - 레코드 생성
-          console.log(`[DIRECT] Creating new like record`);
-          const newLike = this.postLikeRepository.create({
-            post,
-            user: userId ? { id: userId } : null,
-            ipAddress,
-            isDislike: false,
-          });
-
-          const savedLike = await this.postLikeRepository.save(newLike);
-          console.log(
-            `[DIRECT] New like record created with ID: ${savedLike.id}`,
-          );
-
-          // 좋아요 카운터 증가
-          await this.postRepository.increment({ id: postId }, 'likeCount', 1);
-
-          // Redis 캐시 업데이트
-          const likeKey = REDIS_LIKE_KEY.POST_LIKES(postId);
-          const userLikeKey = userId
-            ? REDIS_LIKE_KEY.USER_POST_LIKE(userId, postId)
-            : `ip:${ipAddress}:post:${postId}:like`;
-
-          await this.cacheManager.set(userLikeKey, '1');
-          const currentLikes =
-            (await this.cacheManager.get<number>(likeKey)) || 0;
-          await this.cacheManager.set(likeKey, currentLikes + 1);
-
-          return {
-            liked: true,
-            disliked: false,
-            likeCount: post.likeCount + 1,
-            dislikeCount: post.dislikeCount,
-          };
-        } else if (existingLike.isDislike) {
-          // 이미 싫어요가 있는 경우 - 좋아요로 변경
-          console.log(`[DIRECT] Converting dislike to like`);
-          existingLike.isDislike = false;
-          await this.postLikeRepository.save(existingLike);
-
-          // 카운터 조정 (싫어요 -1, 좋아요 +1)
-          await this.postRepository.increment({ id: postId }, 'likeCount', 1);
-          await this.postRepository.decrement(
-            { id: postId },
-            'dislikeCount',
-            1,
-          );
-
-          // Redis 캐시 업데이트
-          const likeKey = REDIS_LIKE_KEY.POST_LIKES(postId);
-          const dislikeKey = REDIS_LIKE_KEY.POST_DISLIKES(postId);
-          const userLikeKey = userId
-            ? REDIS_LIKE_KEY.USER_POST_LIKE(userId, postId)
-            : `ip:${ipAddress}:post:${postId}:like`;
-          const userDislikeKey = userId
-            ? REDIS_LIKE_KEY.USER_POST_DISLIKE(userId, postId)
-            : `ip:${ipAddress}:post:${postId}:dislike`;
-
-          await this.cacheManager.set(userLikeKey, '1');
-          await this.cacheManager.del(userDislikeKey);
-
-          const currentLikes =
-            (await this.cacheManager.get<number>(likeKey)) || 0;
-          const currentDislikes =
-            (await this.cacheManager.get<number>(dislikeKey)) || 0;
-
-          await this.cacheManager.set(likeKey, currentLikes + 1);
-          if (currentDislikes > 0) {
-            await this.cacheManager.set(dislikeKey, currentDislikes - 1);
-          }
-
-          return {
-            liked: true,
-            disliked: false,
-            likeCount: post.likeCount + 1,
-            dislikeCount: Math.max(0, post.dislikeCount - 1),
-          };
-        } else {
-          // 이미 좋아요가 있는 경우 - 좋아요 취소
-          console.log(`[DIRECT] Canceling existing like`);
-          await this.postLikeRepository.remove(existingLike);
-
-          // 좋아요 카운터 감소
-          await this.postRepository.decrement({ id: postId }, 'likeCount', 1);
-
-          // Redis 캐시 업데이트
-          const likeKey = REDIS_LIKE_KEY.POST_LIKES(postId);
-          const userLikeKey = userId
-            ? REDIS_LIKE_KEY.USER_POST_LIKE(userId, postId)
-            : `ip:${ipAddress}:post:${postId}:like`;
-
-          await this.cacheManager.del(userLikeKey);
-          const currentLikes =
-            (await this.cacheManager.get<number>(likeKey)) || 0;
-          if (currentLikes > 0) {
-            await this.cacheManager.set(likeKey, currentLikes - 1);
-          }
-
-          return {
-            liked: false,
-            disliked: false,
-            likeCount: Math.max(0, post.likeCount - 1),
-            dislikeCount: post.dislikeCount,
-          };
-        }
-      } else if (action === 'dislike') {
-        // 싫어요 처리
-        if (!existingLike) {
-          // 처음 싫어요 누르는 경우 - 레코드 생성
-          console.log(`[DIRECT] Creating new dislike record`);
-          const newDislike = this.postLikeRepository.create({
-            post,
-            user: userId ? { id: userId } : null,
-            ipAddress,
-            isDislike: true,
-          });
-
-          const savedDislike = await this.postLikeRepository.save(newDislike);
-          console.log(
-            `[DIRECT] New dislike record created with ID: ${savedDislike.id}`,
-          );
-
-          // 싫어요 카운터 증가
-          await this.postRepository.increment(
-            { id: postId },
-            'dislikeCount',
-            1,
-          );
-
-          // Redis 캐시 업데이트
-          const dislikeKey = REDIS_LIKE_KEY.POST_DISLIKES(postId);
-          const userDislikeKey = userId
-            ? REDIS_LIKE_KEY.USER_POST_DISLIKE(userId, postId)
-            : `ip:${ipAddress}:post:${postId}:dislike`;
-
-          await this.cacheManager.set(userDislikeKey, '1');
-          const currentDislikes =
-            (await this.cacheManager.get<number>(dislikeKey)) || 0;
-          await this.cacheManager.set(dislikeKey, currentDislikes + 1);
-
-          return {
-            liked: false,
-            disliked: true,
-            likeCount: post.likeCount,
-            dislikeCount: post.dislikeCount + 1,
-          };
-        } else if (!existingLike.isDislike) {
-          // 이미 좋아요가 있는 경우 - 싫어요로 변경
-          console.log(`[DIRECT] Converting like to dislike`);
-          existingLike.isDislike = true;
-          await this.postLikeRepository.save(existingLike);
-
-          // 카운터 조정 (좋아요 -1, 싫어요 +1)
-          await this.postRepository.decrement({ id: postId }, 'likeCount', 1);
-          await this.postRepository.increment(
-            { id: postId },
-            'dislikeCount',
-            1,
-          );
-
-          // Redis 캐시 업데이트
-          const likeKey = REDIS_LIKE_KEY.POST_LIKES(postId);
-          const dislikeKey = REDIS_LIKE_KEY.POST_DISLIKES(postId);
-          const userLikeKey = userId
-            ? REDIS_LIKE_KEY.USER_POST_LIKE(userId, postId)
-            : `ip:${ipAddress}:post:${postId}:like`;
-          const userDislikeKey = userId
-            ? REDIS_LIKE_KEY.USER_POST_DISLIKE(userId, postId)
-            : `ip:${ipAddress}:post:${postId}:dislike`;
-
-          await this.cacheManager.del(userLikeKey);
-          await this.cacheManager.set(userDislikeKey, '1');
-
-          const currentLikes =
-            (await this.cacheManager.get<number>(likeKey)) || 0;
-          const currentDislikes =
-            (await this.cacheManager.get<number>(dislikeKey)) || 0;
-
-          if (currentLikes > 0) {
-            await this.cacheManager.set(likeKey, currentLikes - 1);
-          }
-          await this.cacheManager.set(dislikeKey, currentDislikes + 1);
-
-          return {
-            liked: false,
-            disliked: true,
-            likeCount: Math.max(0, post.likeCount - 1),
-            dislikeCount: post.dislikeCount + 1,
-          };
-        } else {
-          // 이미 싫어요가 있는 경우 - 싫어요 취소
-          console.log(`[DIRECT] Canceling existing dislike`);
-          await this.postLikeRepository.remove(existingLike);
-
-          // 싫어요 카운터 감소
-          await this.postRepository.decrement(
-            { id: postId },
-            'dislikeCount',
-            1,
-          );
-
-          // Redis 캐시 업데이트
-          const dislikeKey = REDIS_LIKE_KEY.POST_DISLIKES(postId);
-          const userDislikeKey = userId
-            ? REDIS_LIKE_KEY.USER_POST_DISLIKE(userId, postId)
-            : `ip:${ipAddress}:post:${postId}:dislike`;
-
-          await this.cacheManager.del(userDislikeKey);
-          const currentDislikes =
-            (await this.cacheManager.get<number>(dislikeKey)) || 0;
-          if (currentDislikes > 0) {
-            await this.cacheManager.set(dislikeKey, currentDislikes - 1);
-          }
-
-          return {
-            liked: false,
-            disliked: false,
-            likeCount: post.likeCount,
-            dislikeCount: Math.max(0, post.dislikeCount - 1),
-          };
-        }
-      }
-
-      throw new Error(`Invalid action: ${action}`);
+      // 클라이언트가 기대하는 형태로 응답 반환
+      return {
+        // 하위 호환성을 위한 플랫 구조
+        liked: newLiked,
+        disliked: newDisliked,
+        likeCount: likes,
+        dislikeCount: dislikes,
+        // 클라이언트가 기대하는 중첩 구조
+        status: {
+          liked: newLiked,
+          disliked: newDisliked,
+        },
+        counts: {
+          likes: likes,
+          dislikes: dislikes,
+        },
+      };
     } catch (error) {
-      console.error(`[DIRECT] Error in togglePostLike:`, error);
+      console.error(`[OPTIMIZED] Error in togglePostLike:`, error);
       throw error;
     }
   }
 
-  // 댓글 좋아요 토글 (유사하게 배치 처리 로직 적용)
+  // 댓글 좋아요 토글 - Redis 우선 접근으로 최적화
   async toggleCommentLike(
     commentId: number,
     userId?: number,
     ipAddress?: string,
   ) {
+    console.log(
+      `[OPTIMIZED] toggleCommentLike - commentId: ${commentId}, userId: ${userId}, ip: ${ipAddress}`,
+    );
+
     // 인증된 사용자나 IP 주소가 없으면 에러
     if (!userId && !ipAddress) {
       throw new Error('User ID or IP address is required');
     }
 
-    // Redis에서 현재 상태 확인
-    const likeKey = REDIS_LIKE_KEY.COMMENT_LIKES(commentId);
-    const userLikeKey = userId
-      ? REDIS_LIKE_KEY.USER_COMMENT_LIKE(userId, commentId)
-      : `ip:${ipAddress}:comment:${commentId}:like`;
+    try {
+      // Redis 캐시 키 생성
+      const likeCountKey = REDIS_LIKE_KEY.COMMENT_LIKES(commentId);
+      const userLikeKey = userId
+        ? REDIS_LIKE_KEY.USER_COMMENT_LIKE(userId, commentId)
+        : `ip:${ipAddress}:comment:${commentId}:like`;
 
-    // 현재 좋아요 상태 확인
-    const hasLiked = (await this.cacheManager.get<string>(userLikeKey)) === '1';
-    const toggleAction = hasLiked ? 'unlike' : 'like';
+      // 현재 상태를 Redis에서 확인
+      const [hasLiked, currentLikes] = await Promise.all([
+        this.cacheManager.get<string>(userLikeKey),
+        this.cacheManager.get<number>(likeCountKey),
+      ]);
 
-    // 캐시 상태 즉시 업데이트
-    if (toggleAction === 'like') {
-      await this.cacheManager.set(userLikeKey, '1');
-      const likes = (await this.cacheManager.get<number>(likeKey)) || 0;
-      await this.cacheManager.set(likeKey, likes + 1);
-    } else {
-      await this.cacheManager.del(userLikeKey);
-      const likes = (await this.cacheManager.get<number>(likeKey)) || 0;
-      if (likes > 0) {
-        await this.cacheManager.set(likeKey, likes - 1);
+      const isCurrentlyLiked = hasLiked === '1';
+      let likes = currentLikes || 0;
+
+      // 캐시가 비어있으면 DB에서 초기화 (댓글은 좋아요만 있음)
+      if (currentLikes === undefined) {
+        console.log(`[CACHE_INIT] Initializing comment cache for ${commentId}`);
+        const comment = await this.commentRepository.findOne({
+          where: { id: commentId },
+          select: ['likeCount'],
+        });
+        if (comment) {
+          likes = comment.likeCount || 0;
+          await this.cacheManager.set(likeCountKey, likes);
+        }
       }
+
+      console.log(
+        `[OPTIMIZED] Comment current state - liked: ${isCurrentlyLiked}, likes: ${likes}`,
+      );
+
+      let newLiked = false;
+      let batchAction: 'like' | 'unlike';
+
+      if (isCurrentlyLiked) {
+        // 이미 좋아요 상태 → 좋아요 취소
+        newLiked = false;
+        likes = Math.max(0, likes - 1);
+        batchAction = 'unlike';
+        await this.cacheManager.del(userLikeKey);
+      } else {
+        // 중립 상태 → 좋아요
+        newLiked = true;
+        likes = likes + 1;
+        batchAction = 'like';
+        await this.cacheManager.set(userLikeKey, '1');
+      }
+
+      // 카운트 캐시 업데이트
+      await this.cacheManager.set(likeCountKey, likes);
+
+      // 배치 처리를 위해 액션 추가 (비동기)
+      setImmediate(() => {
+        this.addToBatch({
+          userId,
+          ipAddress,
+          targetId: commentId,
+          action: batchAction,
+          type: 'comment',
+          timestamp: Date.now(),
+        });
+      });
+
+      console.log(
+        `[OPTIMIZED] Comment updated state - liked: ${newLiked}, likes: ${likes}`,
+      );
+
+      // 즉시 응답 반환
+      return {
+        liked: newLiked,
+        likeCount: likes,
+      };
+    } catch (error) {
+      console.error(`[OPTIMIZED] Error in toggleCommentLike:`, error);
+      throw error;
     }
-
-    // 액션을 배치 큐에 추가
-    this.addToBatch({
-      userId,
-      ipAddress,
-      targetId: commentId,
-      action: toggleAction,
-      type: 'comment',
-      timestamp: Date.now(),
-    });
-
-    // 즉시 임시 응답 반환 (캐시 상태 기반)
-    return {
-      liked: toggleAction === 'like',
-      likeCount: (await this.cacheManager.get<number>(likeKey)) || 0,
-    };
   }
 
   // 게시물 좋아요 상태 가져오기
@@ -533,6 +445,45 @@ export class LikesService {
 
     return {
       likes: likes || 0,
+    };
+  }
+
+  // Redis 캐시 초기화 메서드 추가
+  private async ensureCacheInitialized(postId: number) {
+    const likeCountKey = REDIS_LIKE_KEY.POST_LIKES(postId);
+    const dislikeCountKey = REDIS_LIKE_KEY.POST_DISLIKES(postId);
+
+    // 캐시가 비어있는지 확인
+    const [cachedLikes, cachedDislikes] = await Promise.all([
+      this.cacheManager.get<number>(likeCountKey),
+      this.cacheManager.get<number>(dislikeCountKey),
+    ]);
+
+    // 캐시가 비어있으면 DB에서 로드
+    if (cachedLikes === undefined || cachedDislikes === undefined) {
+      console.log(`[CACHE_INIT] Initializing cache for post ${postId}`);
+
+      const post = await this.postRepository.findOne({
+        where: { id: postId },
+        select: ['likeCount', 'dislikeCount'],
+      });
+
+      if (post) {
+        await Promise.all([
+          this.cacheManager.set(likeCountKey, post.likeCount || 0),
+          this.cacheManager.set(dislikeCountKey, post.dislikeCount || 0),
+        ]);
+
+        return {
+          likes: post.likeCount || 0,
+          dislikes: post.dislikeCount || 0,
+        };
+      }
+    }
+
+    return {
+      likes: cachedLikes || 0,
+      dislikes: cachedDislikes || 0,
     };
   }
 }

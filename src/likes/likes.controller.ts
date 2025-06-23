@@ -24,23 +24,8 @@ export class LikesController {
     const userId = req.user?.id || null;
     const ipAddress = req.ip;
 
-    // 좋아요 토글 후 상태와 카운트를 함께 반환
-    const result = await this.likesService.togglePostLike(
-      postId,
-      'like',
-      userId,
-      ipAddress,
-    );
-    const [status, counts] = await Promise.all([
-      this.likesService.getPostLikeStatus(postId, userId, ipAddress),
-      this.likesService.getPostLikeCounts(postId),
-    ]);
-
-    return {
-      ...result,
-      status,
-      counts,
-    };
+    // 좋아요 토글만 호출하고 모든 정보를 한 번에 반환받음
+    return this.likesService.togglePostLike(postId, 'like', userId, ipAddress);
   }
 
   @Post('posts/:id/dislike')
@@ -52,23 +37,13 @@ export class LikesController {
     const userId = req.user?.id || null;
     const ipAddress = req.ip;
 
-    // 싫어요 토글 후 상태와 카운트를 함께 반환
-    const result = await this.likesService.togglePostLike(
+    // 싫어요 토글만 호출하고 모든 정보를 한 번에 반환받음
+    return this.likesService.togglePostLike(
       postId,
       'dislike',
       userId,
       ipAddress,
     );
-    const [status, counts] = await Promise.all([
-      this.likesService.getPostLikeStatus(postId, userId, ipAddress),
-      this.likesService.getPostLikeCounts(postId),
-    ]);
-
-    return {
-      ...result,
-      status,
-      counts,
-    };
   }
 
   @Post('comments/:id/like')
