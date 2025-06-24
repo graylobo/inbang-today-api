@@ -6,6 +6,25 @@ import { Repository } from 'typeorm';
 import { User } from '../../entities/user.entity';
 import { ConfigService } from '@nestjs/config';
 import { Configuration } from 'src/config/configuration';
+import { Request } from 'express';
+
+// 커스텀 토큰 추출 함수: Authorization 헤더 또는 쿠키에서 토큰 추출
+const cookieExtractor = (req: Request): string | null => {
+  let token = null;
+
+  // 먼저 Authorization 헤더에서 토큰 시도
+  const authHeader = req.headers.authorization;
+  if (authHeader && authHeader.startsWith('Bearer ')) {
+    token = authHeader.substring(7);
+  }
+
+  // Authorization 헤더에 토큰이 없으면 쿠키에서 시도
+  if (!token && req.cookies && req.cookies.access_token) {
+    token = req.cookies.access_token;
+  }
+
+  return token;
+};
 
 @Injectable()
 export class JwtStrategy extends PassportStrategy(Strategy) {
@@ -15,7 +34,7 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
     private configService: ConfigService<Configuration>,
   ) {
     super({
-      jwtFromRequest: ExtractJwt.fromAuthHeaderAsBearerToken(),
+      jwtFromRequest: cookieExtractor, // 커스텀 추출 함수 사용
       ignoreExpiration: false,
       secretOrKey: configService.get('jwt.secret', { infer: true }),
     });
