@@ -137,6 +137,20 @@ export class AuthController {
     return { user };
   }
 
+  @Post('logout')
+  async logout(@Res() res: Response) {
+    const isProduction = this.configService.get('NODE_ENV') === 'production';
+
+    res.clearCookie('access_token', {
+      path: '/',
+      domain: this.getCookieDomain(),
+      secure: isProduction,
+      sameSite: isProduction ? 'none' : 'lax',
+    });
+
+    return res.json({ message: 'Logged out successfully' });
+  }
+
   private getCookieDomain(): string | undefined {
     const isProduction = this.configService.get('NODE_ENV') === 'production';
     return isProduction ? '.inbangtoday.com' : undefined;
