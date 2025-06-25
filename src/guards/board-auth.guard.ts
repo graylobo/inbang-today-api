@@ -7,6 +7,7 @@ import {
 import { JwtService } from '@nestjs/jwt';
 import { ErrorCode } from 'src/common/enums/error-codes.enum';
 import { BoardService } from '../modules/board/board.service';
+import { extractTokenFromRequest } from 'src/common/utils/token-extractor.util';
 
 @Injectable()
 export class BoardAuthGuard implements CanActivate {
@@ -33,13 +34,12 @@ export class BoardAuthGuard implements CanActivate {
     }
 
     // 익명 게시판이 아닌 경우 JWT 인증 필요
-    const authHeader = request.headers.authorization;
-    if (!authHeader) {
+    const token = extractTokenFromRequest(request);
+    if (!token) {
       throw new UnauthorizedException(ErrorCode.UNAUTHORIZED);
     }
 
     try {
-      const token = authHeader.split(' ')[1];
       const decoded = this.jwtService.verify(token);
 
       // 인증된 사용자 정보를 request에 추가
