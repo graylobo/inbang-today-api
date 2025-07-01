@@ -84,7 +84,7 @@ export class CommentService {
   async delete(id: number, password?: string): Promise<void> {
     const comment = await this.commentRepository.findOne({
       where: { id },
-      relations: ['replies'],
+      relations: ['replies', 'parent'],
     });
 
     if (!comment) {
@@ -97,6 +97,8 @@ export class CommentService {
       }
     }
 
+    const parentId = comment.parent?.id;
+
     if (comment.replies?.length > 0) {
       await this.commentRepository.update(id, {
         content: '삭제된 댓글입니다.',
@@ -106,6 +108,41 @@ export class CommentService {
       });
     } else {
       await this.commentRepository.delete(id);
+    }
+
+    // 부모 댓글이 있고, 현재 댓글이 실제로 삭제된 경우 부모 댓글들도 정리
+    if (parentId && comment.replies?.length === 0) {
+      await this.cleanupDeletedParents(parentId);
+    }
+  }
+
+  /**
+   * 삭제된 상태의 부모 댓글들을 재귀적으로 정리
+   * 하위 댓글이 모두 삭제된 "삭제된 댓글입니다" 상태의 댓글들을 실제로 삭제
+   */
+  private async cleanupDeletedParents(parentId: number): Promise<void> {
+    const parent = await this.commentRepository.findOne({
+      where: { id: parentId },
+      relations: ['replies', 'parent'],
+    });
+
+    if (!parent) {
+      return;
+    }
+
+    // 부모가 "삭제된 댓글입니다" 상태이고, 하위 댓글이 없는 경우
+    if (
+      parent.content === '삭제된 댓글입니다.' &&
+      !parent.author &&
+      (!parent.replies || parent.replies.length === 0)
+    ) {
+      const grandParentId = parent.parent?.id;
+      await this.commentRepository.delete(parentId);
+
+      // 조부모 댓글도 확인
+      if (grandParentId) {
+        await this.cleanupDeletedParents(grandParentId);
+      }
     }
   }
 
