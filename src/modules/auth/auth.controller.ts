@@ -80,6 +80,25 @@ export class AuthController {
   @UseGuards(JwtAuthGuard)
   @Get('me')
   getProfile(@Request() req) {
+    // 임시 사용자인 경우 쿠키에서 temp_user_info도 함께 반환
+    if (req.user.isTempUser) {
+      const tempUserInfoCookie = req.cookies?.temp_user_info;
+      let tempUserInfo = null;
+
+      if (tempUserInfoCookie) {
+        try {
+          tempUserInfo = JSON.parse(tempUserInfoCookie);
+        } catch (error) {
+          console.error('temp_user_info 쿠키 파싱 오류:', error);
+        }
+      }
+
+      return {
+        ...req.user,
+        tempUserInfo,
+      };
+    }
+
     return req.user;
   }
 
@@ -95,6 +114,7 @@ export class AuthController {
   async completeSocialSignup(
     @Request() req,
     @Body() data: { name: string; tempUserInfo: any },
+    @Res() res: Response,
   ) {
     // 임시 사용자 정보 검증 (토큰 검증은 이미 JWT 미들웨어에서 처리됨)
     if (!req.user.isTempUser || !req.user.socialId) {
@@ -116,8 +136,26 @@ export class AuthController {
 
     // 정식 토큰 발급
     const token = await this.authService.login(user);
+    const isProduction = this.configService.get('NODE_ENV') === 'production';
 
-    return token;
+    // 정식 사용자 토큰으로 교체
+    res.cookie('access_token', token.access_token, {
+      httpOnly: true,
+      secure: isProduction,
+      sameSite: isProduction ? 'none' : 'lax',
+      path: '/',
+      domain: this.getCookieDomain(),
+    });
+
+    // temp_user_info 쿠키 삭제 (더 이상 필요하지 않음)
+    res.clearCookie('temp_user_info', {
+      path: '/',
+      domain: this.getCookieDomain(),
+      secure: isProduction,
+      sameSite: isProduction ? 'none' : 'lax',
+    });
+
+    return res.json(token);
   }
 
   @UseGuards(JwtAuthGuard)
@@ -142,6 +180,14 @@ export class AuthController {
     const isProduction = this.configService.get('NODE_ENV') === 'production';
 
     res.clearCookie('access_token', {
+      path: '/',
+      domain: this.getCookieDomain(),
+      secure: isProduction,
+      sameSite: isProduction ? 'none' : 'lax',
+    });
+
+    // temp_user_info 쿠키도 삭제
+    res.clearCookie('temp_user_info', {
       path: '/',
       domain: this.getCookieDomain(),
       secure: isProduction,
