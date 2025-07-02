@@ -15,6 +15,7 @@ import { CommentService } from './comment.service';
 import { PostService } from './post.service';
 import * as bcrypt from 'bcrypt';
 import { JwtAuthGuard } from 'src/guards/jwt-auth.guard';
+import { AdminGuard } from 'src/guards/admin.guard';
 
 @Controller('comments')
 export class CommentController {
@@ -133,5 +134,25 @@ export class CommentController {
     }
 
     return { success: true };
+  }
+
+  // =================== 관리자용 엔드포인트 ===================
+
+  @Get('admin/post/:postId/with-deleted')
+  @UseGuards(AdminGuard)
+  async findByPostIdWithDeleted(@Param('postId') postId: string) {
+    return this.commentService.findByPostIdWithDeleted(+postId);
+  }
+
+  @Delete('admin/:id/force')
+  @UseGuards(AdminGuard)
+  async forceDelete(@Param('id') id: string) {
+    return this.commentService.forceDelete(+id);
+  }
+
+  @Post('admin/:id/restore')
+  @UseGuards(AdminGuard)
+  async restore(@Param('id') id: string) {
+    return this.commentService.restore(+id);
   }
 }

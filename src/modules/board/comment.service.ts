@@ -106,40 +106,39 @@ export class CommentService {
         authorName: null,
         password: null,
       });
+      await this.commentRepository.softDelete(id);
     } else {
-      await this.commentRepository.delete(id);
+      await this.commentRepository.softDelete(id);
     }
 
-    // 부모 댓글이 있고, 현재 댓글이 실제로 삭제된 경우 부모 댓글들도 정리
-    if (parentId && comment.replies?.length === 0) {
+    if (parentId) {
       await this.cleanupDeletedParents(parentId);
     }
   }
 
-  /**
-   * 삭제된 상태의 부모 댓글들을 재귀적으로 정리
-   * 하위 댓글이 모두 삭제된 "삭제된 댓글입니다" 상태의 댓글들을 실제로 삭제
-   */
   private async cleanupDeletedParents(parentId: number): Promise<void> {
     const parent = await this.commentRepository.findOne({
       where: { id: parentId },
       relations: ['replies', 'parent'],
+      withDeleted: true,
     });
 
     if (!parent) {
       return;
     }
 
-    // 부모가 "삭제된 댓글입니다" 상태이고, 하위 댓글이 없는 경우
+    const activeRepliesCount = await this.commentRepository.count({
+      where: { parent: { id: parentId } },
+    });
+
     if (
       parent.content === '삭제된 댓글입니다.' &&
       !parent.author &&
-      (!parent.replies || parent.replies.length === 0)
+      activeRepliesCount === 0
     ) {
       const grandParentId = parent.parent?.id;
       await this.commentRepository.delete(parentId);
 
-      // 조부모 댓글도 확인
       if (grandParentId) {
         await this.cleanupDeletedParents(grandParentId);
       }
@@ -154,6 +153,10 @@ export class CommentService {
 
     if (!parent) {
       throw new NotFoundException('원본 댓글을 찾을 수 없습니다.');
+    }
+
+    if (parent.content === '삭제된 댓글입니다.') {
+      throw new NotFoundException('삭제된 댓글에는 대댓글을 달 수 없습니다.');
     }
 
     const replies = this.commentRepository.create({
@@ -185,5 +188,42 @@ export class CommentService {
     }
 
     return comment;
+  }
+
+  async findByPostIdWithDeleted(postId: number): Promise<Comment[]> {
+    return this.commentRepository.find({
+      where: { post: { id: postId } },
+      relations: ['author', 'parent', 'replies', 'replies.author'],
+      withDeleted: true,
+      order: {
+        createdAt: 'ASC',
+        replies: {
+          createdAt: 'ASC',
+        },
+      },
+    });
+  }
+
+  async forceDelete(id: number): Promise<void> {
+    const comment = await this.commentRepository.findOne({
+      where: { id },
+      withDeleted: true,
+    });
+
+    if (!comment) {
+      throw new NotFoundException('댓글을 찾을 수 없습니다.');
+    }
+
+    await this.commentRepository.delete(id);
+  }
+
+  async restore(id: number): Promise<Comment> {
+    const result = await this.commentRepository.restore(id);
+
+    if (result.affected === 0) {
+      throw new NotFoundException('복구할 댓글을 찾을 수 없습니다.');
+    }
+
+    return this.findById(id);
   }
 }
