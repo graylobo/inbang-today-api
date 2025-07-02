@@ -100,26 +100,28 @@ export class CommentService {
     const parentId = comment.parent?.id;
 
     if (comment.replies?.length > 0) {
+      // 하위 댓글이 있는 경우: 내용만 변경하고 실제 삭제하지 않음
       await this.commentRepository.update(id, {
         content: '삭제된 댓글입니다.',
         author: null,
         authorName: null,
         password: null,
       });
-      await this.commentRepository.softDelete(id);
     } else {
+      // 하위 댓글이 없는 경우: 완전 삭제
       await this.commentRepository.softDelete(id);
-    }
 
-    if (parentId) {
-      await this.cleanupDeletedParents(parentId);
+      // 부모 댓글 정리는 실제 삭제가 완료된 후에만 실행
+      if (parentId) {
+        await this.cleanupDeletedParents(parentId);
+      }
     }
   }
 
   private async cleanupDeletedParents(parentId: number): Promise<void> {
     const parent = await this.commentRepository.findOne({
       where: { id: parentId },
-      relations: ['replies', 'parent'],
+      relations: ['parent'],
       withDeleted: true,
     });
 
@@ -127,18 +129,25 @@ export class CommentService {
       return;
     }
 
-    const activeRepliesCount = await this.commentRepository.count({
-      where: { parent: { id: parentId } },
-    });
+    // soft delete되지 않은 활성 하위 댓글 수를 정확히 계산
+    const activeRepliesCount = await this.commentRepository
+      .createQueryBuilder('comment')
+      .where('comment.parentId = :parentId', { parentId })
+      .andWhere('comment.deletedAt IS NULL')
+      .getCount();
 
+    // 삭제된 댓글이고 활성 하위 댓글이 없는 경우에만 정리
     if (
       parent.content === '삭제된 댓글입니다.' &&
       !parent.author &&
       activeRepliesCount === 0
     ) {
       const grandParentId = parent.parent?.id;
-      await this.commentRepository.delete(parentId);
 
+      // soft delete로 안전하게 삭제
+      await this.commentRepository.softDelete(parentId);
+
+      // 조부모 댓글도 정리가 필요한지 확인
       if (grandParentId) {
         await this.cleanupDeletedParents(grandParentId);
       }
