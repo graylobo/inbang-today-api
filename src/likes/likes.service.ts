@@ -67,7 +67,7 @@ export class LikesService {
 
   // 청크 단위로 병렬 처리
   private async processChunk(chunk: PendingLikeAction[]) {
-    const jobs = chunk.map((item) => {
+    const jobs = chunk.map((item, index) => {
       const actionType = item.action.startsWith('un')
         ? item.action.substring(2)
         : item.action;
@@ -89,10 +89,10 @@ export class LikesService {
           type: item.type,
         },
         {
-          // 같은 항목이 중복 처리되지 않도록 jobId 설정
-          jobId: `${item.type}:${item.targetId}:${item.userId || item.ipAddress}:${item.action}`,
-          // 작업 우선순위 설정 (더 최근 것이 높은 우선순위)
-          priority: item.timestamp,
+          // 모든 액션이 순차적으로 처리되도록 고유한 jobId 생성
+          jobId: `${item.type}:${item.targetId}:${item.userId || item.ipAddress}:${item.action}:${item.timestamp}`,
+          // 작업 우선순위 설정 (더 최근 것이 높은 우선순위) - BullMQ 범위내로 조정
+          priority: Math.min(1000 + index, 2097152),
         },
       );
     });
@@ -102,21 +102,16 @@ export class LikesService {
 
   // 좋아요 액션을 배치 큐에 추가
   private addToBatch(action: PendingLikeAction): void {
-    // 유형, 타겟ID, 사용자/IP, 액션타입을 포함한 고유 키 생성
-    // 'un'으로 시작하는 액션은 기본 액션으로 변환 (예: unlike → like)
-    const actionBase = action.action.startsWith('un')
-      ? action.action.substring(2)
-      : action.action;
-
-    const key = `${action.type}:${action.targetId}:${action.userId || action.ipAddress}:${actionBase}`;
+    // 유형, 타겟ID, 사용자/IP, 실제 액션을 포함한 고유 키 생성
+    // like와 unlike를 구분하여 각각 처리할 수 있도록 함
+    const key = `${action.type}:${action.targetId}:${action.userId || action.ipAddress}:${action.action}:${Date.now()}`;
 
     // 더 자세한 로깅
     console.log(
       `Adding action to batch with key: ${key}, action: ${action.action}`,
     );
 
-    // 이미 동일한 키가 있으면 최신 액션으로 업데이트
-    // 없으면 새로 추가
+    // 고유한 키로 모든 액션을 순차적으로 처리
     this.pendingLikes.set(key, {
       ...action,
       timestamp: Date.now(),
@@ -403,17 +398,12 @@ export class LikesService {
 
   // 게시물 좋아요 개수 가져오기
   async getPostLikeCounts(postId: number) {
-    const likeKey = REDIS_LIKE_KEY.POST_LIKES(postId);
-    const dislikeKey = REDIS_LIKE_KEY.POST_DISLIKES(postId);
-
-    const [likes, dislikes] = await Promise.all([
-      this.cacheManager.get<number>(likeKey),
-      this.cacheManager.get<number>(dislikeKey),
-    ]);
+    // 캐시가 없으면 DB에서 초기화
+    const cacheData = await this.ensureCacheInitialized(postId);
 
     return {
-      likes: likes || 0,
-      dislikes: dislikes || 0,
+      likes: cacheData.likes,
+      dislikes: cacheData.dislikes,
     };
   }
 

@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
+import { ScheduleModule } from '@nestjs/schedule';
 import { AppController } from 'src/app.controller';
 import { AppService } from 'src/app.service';
 import { Board } from 'src/entities/board.entity';
@@ -70,6 +71,7 @@ import { EloRankingModule } from './modules/elo-ranking/elo-ranking.module';
         }
       })(),
     }),
+    ScheduleModule.forRoot(),
     EventEmitterModule.forRoot(),
     TypeOrmModule.forRoot({
       type: 'postgres',

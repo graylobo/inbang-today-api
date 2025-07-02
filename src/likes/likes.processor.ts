@@ -144,11 +144,6 @@ export class LikesProcessor extends WorkerHost {
       // Redis 캐시 업데이트
       console.log(`Updating Redis cache: Setting ${userLikeKey} to 1`);
       await this.cacheManager.set(userLikeKey, '1');
-
-      // 좋아요 카운트 업데이트 (Redis에서 현재 값 확인 후 설정)
-      const currentLikes = (await this.cacheManager.get<number>(likeKey)) || 0;
-      await this.cacheManager.set(likeKey, currentLikes + 1);
-      console.log(`Updated Redis like count to ${currentLikes + 1}`);
     } else {
       // 좋아요 취소 로직
       console.log(
@@ -189,13 +184,25 @@ export class LikesProcessor extends WorkerHost {
       // Redis 캐시 업데이트
       console.log(`Removing like from Redis cache: Deleting ${userLikeKey}`);
       await this.cacheManager.del(userLikeKey);
+    }
 
-      // 좋아요 카운트 업데이트 (Redis에서 현재 값 확인 후 설정)
-      const currentLikes = (await this.cacheManager.get<number>(likeKey)) || 0;
-      if (currentLikes > 0) {
-        await this.cacheManager.set(likeKey, currentLikes - 1);
-        console.log(`Updated Redis like count to ${currentLikes - 1}`);
-      }
+    // DB에서 실제 카운트 조회 후 Redis 동기화
+    const updatedPost = await this.postRepository.findOne({
+      where: { id: postId },
+      select: ['likeCount', 'dislikeCount'],
+    });
+
+    if (updatedPost) {
+      await Promise.all([
+        this.cacheManager.set(likeKey, updatedPost.likeCount || 0),
+        this.cacheManager.set(
+          REDIS_LIKE_KEY.POST_DISLIKES(postId),
+          updatedPost.dislikeCount || 0,
+        ),
+      ]);
+      console.log(
+        `Synced Redis cache with DB: likes=${updatedPost.likeCount}, dislikes=${updatedPost.dislikeCount}`,
+      );
     }
 
     console.log(`Completed handlePostLike: ${action} for post:${postId}`);
@@ -287,11 +294,24 @@ export class LikesProcessor extends WorkerHost {
     console.log(`Updating Redis cache: Setting ${userDislikeKey} to 1`);
     await this.cacheManager.set(userDislikeKey, '1');
 
-    // 싫어요 카운트 업데이트
-    const currentDislikes =
-      (await this.cacheManager.get<number>(dislikeKey)) || 0;
-    await this.cacheManager.set(dislikeKey, currentDislikes + 1);
-    console.log(`Updated Redis dislike count to ${currentDislikes + 1}`);
+    // DB에서 실제 카운트 조회 후 Redis 동기화
+    const updatedPost = await this.postRepository.findOne({
+      where: { id: postId },
+      select: ['likeCount', 'dislikeCount'],
+    });
+
+    if (updatedPost) {
+      await Promise.all([
+        this.cacheManager.set(
+          REDIS_LIKE_KEY.POST_LIKES(postId),
+          updatedPost.likeCount || 0,
+        ),
+        this.cacheManager.set(dislikeKey, updatedPost.dislikeCount || 0),
+      ]);
+      console.log(
+        `Synced Redis cache with DB: likes=${updatedPost.likeCount}, dislikes=${updatedPost.dislikeCount}`,
+      );
+    }
 
     console.log(`Completed handlePostDislike for post:${postId}`);
   }
@@ -350,12 +370,23 @@ export class LikesProcessor extends WorkerHost {
     );
     await this.cacheManager.del(userDislikeKey);
 
-    // 싫어요 카운트 업데이트
-    const currentDislikes =
-      (await this.cacheManager.get<number>(dislikeKey)) || 0;
-    if (currentDislikes > 0) {
-      await this.cacheManager.set(dislikeKey, currentDislikes - 1);
-      console.log(`Updated Redis dislike count to ${currentDislikes - 1}`);
+    // DB에서 실제 카운트 조회 후 Redis 동기화
+    const updatedPost = await this.postRepository.findOne({
+      where: { id: postId },
+      select: ['likeCount', 'dislikeCount'],
+    });
+
+    if (updatedPost) {
+      await Promise.all([
+        this.cacheManager.set(
+          REDIS_LIKE_KEY.POST_LIKES(postId),
+          updatedPost.likeCount || 0,
+        ),
+        this.cacheManager.set(dislikeKey, updatedPost.dislikeCount || 0),
+      ]);
+      console.log(
+        `Synced Redis cache with DB: likes=${updatedPost.likeCount}, dislikes=${updatedPost.dislikeCount}`,
+      );
     }
 
     console.log(`Completed handlePostDislikeRemoval for post:${postId}`);
@@ -405,8 +436,6 @@ export class LikesProcessor extends WorkerHost {
 
       // Redis 캐시 업데이트
       await this.cacheManager.set(userLikeKey, '1');
-      const currentLikes = (await this.cacheManager.get<number>(likeKey)) || 0;
-      await this.cacheManager.set(likeKey, currentLikes + 1);
     } else {
       // 좋아요 엔티티가 있는지 확인
       const existingLike = await this.commentLikeRepository.findOne({
@@ -430,10 +459,19 @@ export class LikesProcessor extends WorkerHost {
 
       // Redis 캐시 업데이트
       await this.cacheManager.del(userLikeKey);
-      const currentLikes = (await this.cacheManager.get<number>(likeKey)) || 0;
-      if (currentLikes > 0) {
-        await this.cacheManager.set(likeKey, currentLikes - 1);
-      }
+    }
+
+    // DB에서 실제 카운트 조회 후 Redis 동기화
+    const updatedComment = await this.commentRepository.findOne({
+      where: { id: commentId },
+      select: ['likeCount'],
+    });
+
+    if (updatedComment) {
+      await this.cacheManager.set(likeKey, updatedComment.likeCount || 0);
+      console.log(
+        `Synced comment Redis cache with DB: likes=${updatedComment.likeCount}`,
+      );
     }
   }
 }
