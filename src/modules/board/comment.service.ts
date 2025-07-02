@@ -100,9 +100,9 @@ export class CommentService {
     const parentId = comment.parent?.id;
 
     if (comment.replies?.length > 0) {
-      // 하위 댓글이 있는 경우: 내용만 변경하고 실제 삭제하지 않음
+      // 하위 댓글이 있는 경우: 원본 내용을 보존하고 isDeleted만 true로 설정
       await this.commentRepository.update(id, {
-        content: '삭제된 댓글입니다.',
+        isDeleted: true,
         author: null,
         authorName: null,
         password: null,
@@ -137,11 +137,7 @@ export class CommentService {
       .getCount();
 
     // 삭제된 댓글이고 활성 하위 댓글이 없는 경우에만 정리
-    if (
-      parent.content === '삭제된 댓글입니다.' &&
-      !parent.author &&
-      activeRepliesCount === 0
-    ) {
+    if (parent.isDeleted && !parent.author && activeRepliesCount === 0) {
       const grandParentId = parent.parent?.id;
 
       // soft delete로 안전하게 삭제
@@ -164,7 +160,7 @@ export class CommentService {
       throw new NotFoundException('원본 댓글을 찾을 수 없습니다.');
     }
 
-    if (parent.content === '삭제된 댓글입니다.') {
+    if (parent.isDeleted) {
       throw new NotFoundException('삭제된 댓글에는 대댓글을 달 수 없습니다.');
     }
 
