@@ -19,6 +19,7 @@ export class CommentService {
     return this.commentRepository.find({
       where: { post: { id: postId } },
       relations: ['author', 'parent', 'replies', 'replies.author'],
+      withDeleted: true, // 삭제된 댓글도 포함하여 조회
       order: {
         createdAt: 'ASC',
         replies: {
@@ -99,22 +100,12 @@ export class CommentService {
 
     const parentId = comment.parent?.id;
 
-    if (comment.replies?.length > 0) {
-      // 하위 댓글이 있는 경우: 원본 내용을 보존하고 isDeleted만 true로 설정
-      await this.commentRepository.update(id, {
-        isDeleted: true,
-        author: null,
-        authorName: null,
-        password: null,
-      });
-    } else {
-      // 하위 댓글이 없는 경우: 완전 삭제
-      await this.commentRepository.softDelete(id);
+    // 모든 댓글을 softDelete로 처리 (하위 댓글 유무와 관계없이)
+    await this.commentRepository.softDelete(id);
 
-      // 부모 댓글 정리는 실제 삭제가 완료된 후에만 실행
-      if (parentId) {
-        await this.cleanupDeletedParents(parentId);
-      }
+    // 부모 댓글 정리 실행
+    if (parentId) {
+      await this.cleanupDeletedParents(parentId);
     }
   }
 
@@ -137,7 +128,7 @@ export class CommentService {
       .getCount();
 
     // 삭제된 댓글이고 활성 하위 댓글이 없는 경우에만 정리
-    if (parent.isDeleted && !parent.author && activeRepliesCount === 0) {
+    if (parent.deletedAt && activeRepliesCount === 0) {
       const grandParentId = parent.parent?.id;
 
       // soft delete로 안전하게 삭제
@@ -160,7 +151,7 @@ export class CommentService {
       throw new NotFoundException('원본 댓글을 찾을 수 없습니다.');
     }
 
-    if (parent.isDeleted) {
+    if (parent.deletedAt) {
       throw new NotFoundException('삭제된 댓글에는 대댓글을 달 수 없습니다.');
     }
 
