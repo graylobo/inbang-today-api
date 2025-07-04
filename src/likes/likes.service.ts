@@ -14,8 +14,7 @@ import { Interval } from '@nestjs/schedule';
 
 // 배치 처리를 위한 인터페이스 정의
 interface PendingLikeAction {
-  userId: number | null;
-  ipAddress: string | null;
+  userId: number;
   targetId: number;
   action: 'like' | 'unlike' | 'dislike' | 'undislike';
   type: 'post' | 'comment';
@@ -75,14 +74,13 @@ export class LikesService {
       const isRemoval = item.action.startsWith('un');
 
       console.log(
-        `Adding job to queue: ${actionType} (removal: ${isRemoval}) for ${item.type}:${item.targetId}, user:${item.userId || item.ipAddress}`,
+        `Adding job to queue: ${actionType} (removal: ${isRemoval}) for ${item.type}:${item.targetId}, user:${item.userId}`,
       );
 
       return this.likesQueue.add(
         'processLike',
         {
           userId: item.userId,
-          ipAddress: item.ipAddress,
           targetId: item.targetId,
           action: actionType as 'like' | 'dislike',
           isRemoval: isRemoval,
@@ -90,7 +88,7 @@ export class LikesService {
         },
         {
           // 모든 액션이 순차적으로 처리되도록 고유한 jobId 생성
-          jobId: `${item.type}:${item.targetId}:${item.userId || item.ipAddress}:${item.action}:${item.timestamp}`,
+          jobId: `${item.type}:${item.targetId}:${item.userId}:${item.action}:${item.timestamp}`,
           // 작업 우선순위 설정 (더 최근 것이 높은 우선순위) - BullMQ 범위내로 조정
           priority: Math.min(1000 + index, 2097152),
         },
@@ -102,9 +100,9 @@ export class LikesService {
 
   // 좋아요 액션을 배치 큐에 추가
   private addToBatch(action: PendingLikeAction): void {
-    // 유형, 타겟ID, 사용자/IP, 실제 액션을 포함한 고유 키 생성
+    // 유형, 타겟ID, 사용자ID, 실제 액션을 포함한 고유 키 생성
     // like와 unlike를 구분하여 각각 처리할 수 있도록 함
-    const key = `${action.type}:${action.targetId}:${action.userId || action.ipAddress}:${action.action}:${Date.now()}`;
+    const key = `${action.type}:${action.targetId}:${action.userId}:${action.action}:${Date.now()}`;
 
     // 더 자세한 로깅
     console.log(
@@ -125,26 +123,21 @@ export class LikesService {
   async togglePostLike(
     postId: number,
     action: 'like' | 'dislike',
-    userId?: number,
-    ipAddress?: string,
+    userId: number,
   ) {
     console.log(
-      `[OPTIMIZED] togglePostLike - postId: ${postId}, action: ${action}, userId: ${userId}, ip: ${ipAddress}`,
+      `[OPTIMIZED] togglePostLike - postId: ${postId}, action: ${action}, userId: ${userId}`,
     );
 
-    // 인증된 사용자나 IP 주소가 없으면 에러
-    if (!userId && !ipAddress) {
-      throw new Error('User ID or IP address is required');
+    // 로그인한 사용자만 허용
+    if (!userId) {
+      throw new Error('User ID is required');
     }
 
     try {
       // Redis 캐시 키 생성
-      const userLikeKey = userId
-        ? REDIS_LIKE_KEY.USER_POST_LIKE(userId, postId)
-        : `ip:${ipAddress}:post:${postId}:like`;
-      const userDislikeKey = userId
-        ? REDIS_LIKE_KEY.USER_POST_DISLIKE(userId, postId)
-        : `ip:${ipAddress}:post:${postId}:dislike`;
+      const userLikeKey = REDIS_LIKE_KEY.USER_POST_LIKE(userId, postId);
+      const userDislikeKey = REDIS_LIKE_KEY.USER_POST_DISLIKE(userId, postId);
       const likeCountKey = REDIS_LIKE_KEY.POST_LIKES(postId);
       const dislikeCountKey = REDIS_LIKE_KEY.POST_DISLIKES(postId);
 
@@ -241,7 +234,6 @@ export class LikesService {
       setImmediate(() => {
         this.addToBatch({
           userId,
-          ipAddress,
           targetId: postId,
           action: batchAction,
           type: 'post',
@@ -277,26 +269,20 @@ export class LikesService {
   }
 
   // 댓글 좋아요 토글 - Redis 우선 접근으로 최적화
-  async toggleCommentLike(
-    commentId: number,
-    userId?: number,
-    ipAddress?: string,
-  ) {
+  async toggleCommentLike(commentId: number, userId: number) {
     console.log(
-      `[OPTIMIZED] toggleCommentLike - commentId: ${commentId}, userId: ${userId}, ip: ${ipAddress}`,
+      `[OPTIMIZED] toggleCommentLike - commentId: ${commentId}, userId: ${userId}`,
     );
 
-    // 인증된 사용자나 IP 주소가 없으면 에러
-    if (!userId && !ipAddress) {
-      throw new Error('User ID or IP address is required');
+    // 로그인한 사용자만 허용
+    if (!userId) {
+      throw new Error('User ID is required');
     }
 
     try {
       // Redis 캐시 키 생성
       const likeCountKey = REDIS_LIKE_KEY.COMMENT_LIKES(commentId);
-      const userLikeKey = userId
-        ? REDIS_LIKE_KEY.USER_COMMENT_LIKE(userId, commentId)
-        : `ip:${ipAddress}:comment:${commentId}:like`;
+      const userLikeKey = REDIS_LIKE_KEY.USER_COMMENT_LIKE(userId, commentId);
 
       // 현재 상태를 Redis에서 확인
       const [hasLiked, currentLikes] = await Promise.all([
@@ -348,7 +334,6 @@ export class LikesService {
       setImmediate(() => {
         this.addToBatch({
           userId,
-          ipAddress,
           targetId: commentId,
           action: batchAction,
           type: 'comment',
@@ -372,18 +357,13 @@ export class LikesService {
   }
 
   // 게시물 좋아요 상태 가져오기
-  async getPostLikeStatus(postId: number, userId?: number, ipAddress?: string) {
-    if (!userId && !ipAddress) {
+  async getPostLikeStatus(postId: number, userId: number) {
+    if (!userId) {
       return { liked: false, disliked: false };
     }
 
-    const userLikeKey = userId
-      ? REDIS_LIKE_KEY.USER_POST_LIKE(userId, postId)
-      : `ip:${ipAddress}:post:${postId}:like`;
-
-    const userDislikeKey = userId
-      ? REDIS_LIKE_KEY.USER_POST_DISLIKE(userId, postId)
-      : `ip:${ipAddress}:post:${postId}:dislike`;
+    const userLikeKey = REDIS_LIKE_KEY.USER_POST_LIKE(userId, postId);
+    const userDislikeKey = REDIS_LIKE_KEY.USER_POST_DISLIKE(userId, postId);
 
     const [hasLiked, hasDisliked] = await Promise.all([
       this.cacheManager.get<string>(userLikeKey),
@@ -408,18 +388,12 @@ export class LikesService {
   }
 
   // 댓글 좋아요 상태 가져오기
-  async getCommentLikeStatus(
-    commentId: number,
-    userId?: number,
-    ipAddress?: string,
-  ) {
-    if (!userId && !ipAddress) {
+  async getCommentLikeStatus(commentId: number, userId: number) {
+    if (!userId) {
       return { liked: false };
     }
 
-    const userLikeKey = userId
-      ? REDIS_LIKE_KEY.USER_COMMENT_LIKE(userId, commentId)
-      : `ip:${ipAddress}:comment:${commentId}:like`;
+    const userLikeKey = REDIS_LIKE_KEY.USER_COMMENT_LIKE(userId, commentId);
 
     const hasLiked = await this.cacheManager.get<string>(userLikeKey);
 
