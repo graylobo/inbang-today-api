@@ -57,12 +57,19 @@ export class LikesProcessor extends WorkerHost {
           }
         }
       } else if (type === 'comment') {
-        await this.handleCommentLike(
-          userId,
-          ipAddress,
-          targetId,
-          isRemoval ? 'unlike' : 'like',
-        );
+        if (action === 'like') {
+          await this.handleCommentLike(
+            userId,
+            targetId,
+            isRemoval ? 'unlike' : 'like',
+          );
+        } else if (action === 'dislike') {
+          await this.handleCommentLike(
+            userId,
+            targetId,
+            isRemoval ? 'undislike' : 'dislike',
+          );
+        }
       }
     } catch (error) {
       console.error(
@@ -393,36 +400,63 @@ export class LikesProcessor extends WorkerHost {
   }
 
   private async handleCommentLike(
-    userId: number | null,
-    ipAddress: string | null,
+    userId: number,
     commentId: number,
-    action: 'like' | 'unlike',
+    action: 'like' | 'unlike' | 'dislike' | 'undislike',
   ) {
+    console.log(
+      `Starting handleCommentLike - commentId: ${commentId}, action: ${action}, userId: ${userId}`,
+    );
+
     const comment = await this.commentRepository.findOne({
       where: { id: commentId },
     });
     if (!comment) throw new Error('Comment not found');
 
     const likeKey = REDIS_LIKE_KEY.COMMENT_LIKES(commentId);
-    const userLikeKey = userId
-      ? REDIS_LIKE_KEY.USER_COMMENT_LIKE(userId, commentId)
-      : `ip:${ipAddress}:comment:${commentId}:like`;
+    const dislikeKey = REDIS_LIKE_KEY.COMMENT_DISLIKES(commentId);
+    const userLikeKey = REDIS_LIKE_KEY.USER_COMMENT_LIKE(userId, commentId);
+    const userDislikeKey = REDIS_LIKE_KEY.USER_COMMENT_DISLIKE(
+      userId,
+      commentId,
+    );
 
     if (action === 'like') {
-      // 이미 좋아요 엔티티가 있는지 확인
-      const existingLike = await this.commentLikeRepository.findOne({
+      // 엔티티가 있는지 확인 (타입 무관)
+      const query = {
         where: {
           comment: { id: commentId },
-          ...(userId ? { user: { id: userId } } : { ipAddress }),
+          user: { id: userId },
         },
-      });
+      };
 
-      // 없는 경우에만 좋아요 엔티티 생성
-      if (!existingLike) {
+      const existingLike = await this.commentLikeRepository.findOne(query);
+
+      if (existingLike) {
+        // 싫어요에서 좋아요로 전환된 경우 카운터 조정
+        if (existingLike.isDislike) {
+          console.log(`Converting dislike to like for comment:${commentId}`);
+          await this.commentRepository.decrement(
+            { id: commentId },
+            'dislikeCount',
+            1,
+          );
+          await this.commentRepository.increment(
+            { id: commentId },
+            'likeCount',
+            1,
+          );
+        }
+
+        // 엔티티 업데이트
+        existingLike.isDislike = false;
+        await this.commentLikeRepository.save(existingLike);
+      } else {
+        // 새로운 좋아요 엔티티 생성
         const like = this.commentLikeRepository.create({
           comment,
-          user: userId ? { id: userId } : null,
-          ipAddress,
+          user: { id: userId },
+          isDislike: false,
         });
         await this.commentLikeRepository.save(like);
 
@@ -436,20 +470,19 @@ export class LikesProcessor extends WorkerHost {
 
       // Redis 캐시 업데이트
       await this.cacheManager.set(userLikeKey, '1');
-    } else {
+    } else if (action === 'unlike') {
       // 좋아요 엔티티가 있는지 확인
       const existingLike = await this.commentLikeRepository.findOne({
         where: {
           comment: { id: commentId },
-          ...(userId ? { user: { id: userId } } : { ipAddress }),
+          user: { id: userId },
+          isDislike: false,
         },
       });
 
       // 있는 경우에만 좋아요 제거
       if (existingLike) {
         await this.commentLikeRepository.remove(existingLike);
-
-        // DB 카운터 업데이트
         await this.commentRepository.decrement(
           { id: commentId },
           'likeCount',
@@ -459,19 +492,95 @@ export class LikesProcessor extends WorkerHost {
 
       // Redis 캐시 업데이트
       await this.cacheManager.del(userLikeKey);
+    } else if (action === 'dislike') {
+      // 엔티티가 있는지 확인 (타입 무관)
+      const query = {
+        where: {
+          comment: { id: commentId },
+          user: { id: userId },
+        },
+      };
+
+      const existingLike = await this.commentLikeRepository.findOne(query);
+
+      if (existingLike) {
+        // 좋아요에서 싫어요로 전환된 경우 카운터 조정
+        if (!existingLike.isDislike) {
+          console.log(`Converting like to dislike for comment:${commentId}`);
+          await this.commentRepository.decrement(
+            { id: commentId },
+            'likeCount',
+            1,
+          );
+          await this.commentRepository.increment(
+            { id: commentId },
+            'dislikeCount',
+            1,
+          );
+        }
+
+        // 엔티티 업데이트
+        existingLike.isDislike = true;
+        await this.commentLikeRepository.save(existingLike);
+      } else {
+        // 새로운 싫어요 엔티티 생성
+        const dislike = this.commentLikeRepository.create({
+          comment,
+          user: { id: userId },
+          isDislike: true,
+        });
+        await this.commentLikeRepository.save(dislike);
+
+        // DB 카운터 업데이트
+        await this.commentRepository.increment(
+          { id: commentId },
+          'dislikeCount',
+          1,
+        );
+      }
+
+      // Redis 캐시 업데이트
+      await this.cacheManager.set(userDislikeKey, '1');
+    } else if (action === 'undislike') {
+      // 싫어요 엔티티가 있는지 확인
+      const existingLike = await this.commentLikeRepository.findOne({
+        where: {
+          comment: { id: commentId },
+          user: { id: userId },
+          isDislike: true,
+        },
+      });
+
+      // 있는 경우에만 싫어요 제거
+      if (existingLike) {
+        await this.commentLikeRepository.remove(existingLike);
+        await this.commentRepository.decrement(
+          { id: commentId },
+          'dislikeCount',
+          1,
+        );
+      }
+
+      // Redis 캐시 업데이트
+      await this.cacheManager.del(userDislikeKey);
     }
 
     // DB에서 실제 카운트 조회 후 Redis 동기화
     const updatedComment = await this.commentRepository.findOne({
       where: { id: commentId },
-      select: ['likeCount'],
+      select: ['likeCount', 'dislikeCount'],
     });
 
     if (updatedComment) {
-      await this.cacheManager.set(likeKey, updatedComment.likeCount || 0);
+      await Promise.all([
+        this.cacheManager.set(likeKey, updatedComment.likeCount || 0),
+        this.cacheManager.set(dislikeKey, updatedComment.dislikeCount || 0),
+      ]);
       console.log(
-        `Synced comment Redis cache with DB: likes=${updatedComment.likeCount}`,
+        `Synced comment Redis cache with DB: likes=${updatedComment.likeCount}, dislikes=${updatedComment.dislikeCount}`,
       );
     }
+
+    console.log(`Completed handleCommentLike for comment:${commentId}`);
   }
 }

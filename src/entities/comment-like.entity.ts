@@ -16,4 +16,7 @@ export class CommentLike extends BaseEntity {
 
   @Column({ nullable: true })
   ipAddress: string; // 익명 사용자의 경우 IP 주소로 식별
+
+  @Column({ default: false })
+  isDislike: boolean; // true면 싫어요, false면 좋아요
 }

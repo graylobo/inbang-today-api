@@ -44,4 +44,7 @@ export class Comment extends BaseEntity {
 
   @Column({ default: 0 })
   likeCount: number; // 좋아요 수를 캐시하여 성능 최적화
+
+  @Column({ default: 0 })
+  dislikeCount: number; // 싫어요 수를 캐시하여 성능 최적화
 }

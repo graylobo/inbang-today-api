@@ -46,7 +46,17 @@ export class LikesController {
     @Req() req: AuthenticatedRequest,
   ) {
     const userId = req.user.userId;
-    return this.likesService.toggleCommentLike(commentId, userId);
+    return this.likesService.toggleCommentLike(commentId, 'like', userId);
+  }
+
+  @Post('comments/:id/dislike')
+  @UseGuards(JwtAuthGuard)
+  async toggleCommentDislike(
+    @Param('id') commentId: number,
+    @Req() req: AuthenticatedRequest,
+  ) {
+    const userId = req.user.userId;
+    return this.likesService.toggleCommentLike(commentId, 'dislike', userId);
   }
 
   @Get('posts/:id/count')
