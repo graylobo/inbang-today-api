@@ -25,8 +25,7 @@ interface PendingLikeAction {
 export class LikesService {
   // 배치 처리를 위한 메모리 저장소
   private pendingLikes: Map<string, PendingLikeAction> = new Map();
-  // 배치 처리 간격 (밀리초) - 1초로 단축
-  private readonly BATCH_INTERVAL = 1000; // 1초
+
   // 배치 처리가 예약되었는지 추적
   private batchScheduled = false;
 
@@ -41,7 +40,6 @@ export class LikesService {
     private commentLikeRepository: Repository<CommentLike>,
   ) {}
 
-  // 1초마다 배치 처리 실행 (성능 개선)
   @Interval(1000)
   async processBatch() {
     if (this.pendingLikes.size === 0) return;
@@ -87,8 +85,8 @@ export class LikesService {
           type: item.type,
         },
         {
-          // 모든 액션이 순차적으로 처리되도록 고유한 jobId 생성
-          jobId: `${item.type}:${item.targetId}:${item.userId}:${item.action}:${item.timestamp}`,
+          // 사용자별 타겟별 고유한 jobId 생성 (마지막 상태만 처리)
+          jobId: `${item.type}:${item.targetId}:${item.userId}:${item.timestamp}`,
           // 작업 우선순위 설정 (더 최근 것이 높은 우선순위) - BullMQ 범위내로 조정
           priority: Math.min(1000 + index, 2097152),
         },
@@ -100,16 +98,16 @@ export class LikesService {
 
   // 좋아요 액션을 배치 큐에 추가
   private addToBatch(action: PendingLikeAction): void {
-    // 유형, 타겟ID, 사용자ID, 실제 액션을 포함한 고유 키 생성
-    // like와 unlike를 구분하여 각각 처리할 수 있도록 함
-    const key = `${action.type}:${action.targetId}:${action.userId}:${action.action}:${Date.now()}`;
+    // 사용자별 타겟별 고유 키 생성 (액션과 타임스탬프 제외)
+    // 같은 키에 대해서는 마지막 액션만 유지됨
+    const key = `${action.type}:${action.targetId}:${action.userId}`;
 
     // 더 자세한 로깅
     console.log(
       `Adding action to batch with key: ${key}, action: ${action.action}`,
     );
 
-    // 고유한 키로 모든 액션을 순차적으로 처리
+    // 같은 키의 이전 액션들을 덮어씀 (마지막 상태만 유지)
     this.pendingLikes.set(key, {
       ...action,
       timestamp: Date.now(),
