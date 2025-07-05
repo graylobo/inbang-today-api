@@ -348,7 +348,9 @@ export class StreamerService {
 
     // 크루에 속해있지 않은 경우
     if (!streamer.crew) {
-      throw new ConflictException(`스트리머는 이미 크루에 속해있지 않습니다.`);
+      throw new ConflictException(
+        `해당 스트리머는 이미 크루에 속해있지 않습니다.`,
+      );
     }
 
     // 크루 및 직급 정보 제거
