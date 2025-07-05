@@ -16,7 +16,7 @@ export class CrewSignatureService {
   async findAllByCrewId(crewId: number): Promise<CrewSignature[]> {
     return this.signatureRepository.find({
       where: { crew: { id: crewId } },
-      relations: ['dances', 'dances.member'],
+      relations: ['dances'],
       order: { starballoonCount: 'ASC' },
     });
   }
@@ -39,7 +39,6 @@ export class CrewSignatureService {
         this.dancesRepository.create({
           ...dance,
           signature: savedSignature,
-          member: { id: dance.memberId },
         }),
       );
       await this.dancesRepository.save(danceEntities);
@@ -47,7 +46,7 @@ export class CrewSignatureService {
 
     return this.signatureRepository.findOne({
       where: { id: savedSignature.id },
-      relations: ['dances', 'dances.member'],
+      relations: ['dances'],
     });
   }
 

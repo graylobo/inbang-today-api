@@ -1,7 +1,6 @@
 import { Column, Entity, ManyToOne, PrimaryGeneratedColumn } from 'typeorm';
 import { BaseEntity } from './base.entity';
 import { CrewSignature } from './crew-signature.entity';
-import { Streamer } from './streamer.entity';
 
 @Entity()
 export class CrewSignatureDance extends BaseEntity {
@@ -13,8 +12,8 @@ export class CrewSignatureDance extends BaseEntity {
   })
   signature: CrewSignature;
 
-  @ManyToOne(() => Streamer)
-  member: Streamer;
+  @Column({ nullable: true })
+  memberName: string;
 
   @Column({ type: 'text' })
   danceVideoUrl: string;
