@@ -60,6 +60,6 @@ export class CrewSignatureService {
   }
 
   async delete(id: number): Promise<void> {
-    await this.signatureRepository.delete(id);
+    await this.signatureRepository.softDelete(id);
   }
 }
