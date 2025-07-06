@@ -212,7 +212,7 @@ export class StreamerService {
         throw new NotFoundException('Member not found');
       }
 
-      await this.streamerRepository.remove(streamer);
+      await this.streamerRepository.softDelete(id);
     } catch (error) {
       if (error instanceof NotFoundException) {
         throw error;
