@@ -20,6 +20,9 @@ export class Crew extends BaseEntity {
   @Column({ nullable: true })
   iconUrl: string;
 
+  @Column({ nullable: true })
+  signatureOverviewImageUrl: string;
+
   @OneToMany(() => Streamer, (member) => member.crew)
   members: Streamer[];
 

@@ -9,7 +9,10 @@ import {
   HttpException,
   HttpStatus,
   Query,
+  UseGuards,
+  Patch,
 } from '@nestjs/common';
+import { AdminGuard } from '../../guards/admin.guard';
 import { CrewService } from './crew.service';
 import { Crew } from '../../entities/crew.entity';
 
@@ -83,5 +86,17 @@ export class CrewController {
   @Delete(':id')
   async delete(@Param('id') id: string): Promise<void> {
     return this.crewService.delete(+id);
+  }
+
+  @UseGuards(AdminGuard)
+  @Patch(':id/signature-overview-image-url')
+  async updateSignatureOverviewImageUrl(
+    @Param('id') id: string,
+    @Body() data: { imageUrl: string },
+  ) {
+    return await this.crewService.updateSignatureOverviewImageUrl(
+      +id,
+      data.imageUrl,
+    );
   }
 }

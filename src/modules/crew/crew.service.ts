@@ -1,4 +1,9 @@
-import { Injectable, HttpException, HttpStatus } from '@nestjs/common';
+import {
+  Injectable,
+  HttpException,
+  HttpStatus,
+  NotFoundException,
+} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, Between } from 'typeorm';
 import { Crew } from '../../entities/crew.entity';
@@ -276,5 +281,22 @@ export class CrewService {
     return result.members
       .filter((member) => member.rank && member.rank.id)
       .map((member) => member.rank.id);
+  }
+
+  async updateSignatureOverviewImageUrl(crewId: number, imageUrl: string) {
+    const crew = await this.crewRepository.findOne({ where: { id: crewId } });
+    if (!crew) {
+      throw new NotFoundException(`Crew with ID ${crewId} not found`);
+    }
+
+    crew.signatureOverviewImageUrl = imageUrl;
+    await this.crewRepository.save(crew);
+
+    return {
+      success: true,
+      data: {
+        signatureOverviewImageUrl: imageUrl,
+      },
+    };
   }
 }
