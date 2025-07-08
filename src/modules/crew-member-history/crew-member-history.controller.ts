@@ -34,19 +34,22 @@ export class CrewMemberHistoryController {
   ): Promise<CrewMemberHistory> {
     createDto.performedById = req.user.userId;
 
-    if (createDto.eventType === 'join') {
-      await this.streamerService.joinCrew(
-        createDto.streamerId,
-        createDto.crewId,
-        createDto.newRankId,
-      );
-    } else if (createDto.eventType === 'leave') {
-      await this.streamerService.leaveCrew(createDto.streamerId);
-    } else if (createDto.eventType === 'rank_change') {
-      await this.streamerService.updateRank(
-        createDto.streamerId,
-        createDto.newRankId,
-      );
+    // 과거 히스토리 기록이 아닌 경우에만 현재 소속을 변경
+    if (!createDto.isHistoricalEntry) {
+      if (createDto.eventType === 'join') {
+        await this.streamerService.joinCrew(
+          createDto.streamerId,
+          createDto.crewId,
+          createDto.newRankId,
+        );
+      } else if (createDto.eventType === 'leave') {
+        await this.streamerService.leaveCrew(createDto.streamerId);
+      } else if (createDto.eventType === 'rank_change') {
+        await this.streamerService.updateRank(
+          createDto.streamerId,
+          createDto.newRankId,
+        );
+      }
     }
 
     return this.crewMemberHistoryService.create(createDto);

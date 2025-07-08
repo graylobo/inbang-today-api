@@ -19,6 +19,7 @@ export interface CreateCrewMemberHistoryDto {
   oldRankId?: number;
   newRankId?: number;
   performedById?: number;
+  isHistoricalEntry?: boolean;
 }
 
 export interface UpdateCrewMemberHistoryDto {
@@ -108,20 +109,35 @@ export class CrewMemberHistoryService {
     let newRank = null;
 
     if (eventType === 'rank_change') {
+      // 직급 변경 시 새 직급 ID는 필수
+      if (!newRankId) {
+        throw new Error('직급 변경 시 새 직급이 반드시 필요합니다.');
+      }
+
       if (oldRankId) {
         oldRank = await this.crewRankRepository.findOne({
           where: { id: oldRankId },
+          relations: ['crew'],
         });
       }
 
-      if (newRankId) {
-        newRank = await this.crewRankRepository.findOne({
-          where: { id: newRankId },
-        });
+      newRank = await this.crewRankRepository.findOne({
+        where: { id: newRankId },
+        relations: ['crew'],
+      });
+
+      if (!newRank) {
+        throw new Error(`새 직급 ID ${newRankId}를 찾을 수 없습니다.`);
       }
 
-      if (!oldRank || !newRank) {
-        throw new Error('Old rank or new rank not found');
+      // 새 직급이 해당 크루에 속하는지 확인
+      if (newRank.crew.id !== crewId) {
+        throw new Error(`선택한 새 직급은 해당 크루에 속하지 않습니다.`);
+      }
+
+      // 이전 직급도 같은 크루에 속하는지 확인 (있는 경우)
+      if (oldRank && oldRank.crew.id !== crewId) {
+        throw new Error(`이전 직급이 해당 크루에 속하지 않습니다.`);
       }
     }
 
@@ -161,24 +177,31 @@ export class CrewMemberHistoryService {
     }
     // 입사인 경우에도 초기 직급 정보 기록
     else if (eventType === 'join') {
-      // newRankId가 없으면 로그로 기록
+      // 입사 시 직급 ID는 필수
       if (!newRankId) {
-        console.warn(
-          `입사 이벤트에 초기 직급 ID가 없습니다. 스트리머 ID: ${streamerId}, 크루 ID: ${crewId}`,
-        );
-      } else {
-        history.newRankId = newRankId;
-        // 새 직급 정보 조회
-        const newRank = await this.crewRankRepository.findOne({
-          where: { id: newRankId },
-        });
-        if (newRank) {
-          history.newRank = newRank;
-          console.log(
-            `스트리머(ID: ${streamerId})가 크루(ID: ${crewId})에 초기 직급(${newRank.name})으로 입사했습니다.`,
-          );
-        }
+        throw new Error('입사 처리 시 초기 직급이 반드시 필요합니다.');
       }
+
+      // 새 직급 정보 조회 및 검증
+      const newRank = await this.crewRankRepository.findOne({
+        where: { id: newRankId },
+        relations: ['crew'],
+      });
+
+      if (!newRank) {
+        throw new Error(`직급 ID ${newRankId}를 찾을 수 없습니다.`);
+      }
+
+      // 선택된 직급이 해당 크루에 속하는지 확인
+      if (newRank.crew.id !== crewId) {
+        throw new Error(`선택한 직급은 해당 크루에 속하지 않습니다.`);
+      }
+
+      history.newRankId = newRankId;
+      history.newRank = newRank;
+      console.log(
+        `스트리머(ID: ${streamerId})가 크루(ID: ${crewId})에 초기 직급(${newRank.name})으로 입사했습니다.`,
+      );
     }
 
     return this.crewMemberHistoryRepository.save(history);
