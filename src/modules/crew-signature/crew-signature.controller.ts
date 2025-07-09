@@ -12,7 +12,6 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import { CrewSignature } from '../../entities/crew-signature.entity';
-import { AdminGuard } from '../../guards/admin.guard';
 import { JwtAuthGuard } from '../../guards/jwt-auth.guard';
 import { CrewSignatureService } from './crew-signature.service';
 
@@ -34,7 +33,7 @@ export class CrewSignatureController {
     }
   }
 
-  @UseGuards(JwtAuthGuard, AdminGuard)
+  @UseGuards(JwtAuthGuard)
   @Post()
   async create(@Body() signatureData: any, @Request() req) {
     try {
@@ -48,7 +47,7 @@ export class CrewSignatureController {
     }
   }
 
-  @UseGuards(JwtAuthGuard, AdminGuard)
+  @UseGuards(JwtAuthGuard)
   @Put(':id')
   async update(
     @Param('id') id: string,
@@ -66,7 +65,7 @@ export class CrewSignatureController {
     }
   }
 
-  @UseGuards(JwtAuthGuard, AdminGuard)
+  @UseGuards(JwtAuthGuard)
   @Delete(':id')
   async delete(@Param('id') id: string): Promise<void> {
     try {
