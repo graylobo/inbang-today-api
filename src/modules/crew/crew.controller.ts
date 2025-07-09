@@ -1,20 +1,20 @@
 import {
-  Controller,
-  Get,
-  Post,
-  Put,
-  Delete,
   Body,
-  Param,
+  Controller,
+  Delete,
+  Get,
   HttpException,
   HttpStatus,
+  Param,
+  Patch,
+  Post,
+  Put,
   Query,
   UseGuards,
-  Patch,
 } from '@nestjs/common';
-import { AdminGuard } from '../../guards/admin.guard';
-import { CrewService } from './crew.service';
+import { JwtAuthGuard } from 'src/guards/jwt-auth.guard';
 import { Crew } from '../../entities/crew.entity';
+import { CrewService } from './crew.service';
 
 @Controller('crews')
 export class CrewController {
@@ -88,7 +88,7 @@ export class CrewController {
     return this.crewService.delete(+id);
   }
 
-  @UseGuards(AdminGuard)
+  @UseGuards(JwtAuthGuard)
   @Patch(':id/signature-overview-image-url')
   async updateSignatureOverviewImageUrl(
     @Param('id') id: string,
