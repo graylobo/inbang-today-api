@@ -1,6 +1,7 @@
 import { Column, Entity, ManyToOne, PrimaryGeneratedColumn } from 'typeorm';
 import { BaseEntity } from './base.entity';
 import { CrewSignature } from './crew-signature.entity';
+import { User } from './user.entity';
 
 @Entity()
 export class CrewSignatureDance extends BaseEntity {
@@ -20,4 +21,10 @@ export class CrewSignatureDance extends BaseEntity {
 
   @Column({ type: 'date' })
   performedAt: Date;
+
+  @ManyToOne(() => User, { nullable: true })
+  createdBy: User;
+
+  @ManyToOne(() => User, { nullable: true })
+  updatedBy: User;
 }

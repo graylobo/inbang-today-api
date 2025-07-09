@@ -4,9 +4,12 @@ import { CrewSignature } from '../../entities/crew-signature.entity';
 import { CrewSignatureService } from './crew-signature.service';
 import { CrewSignatureController } from './crew-signature.controller';
 import { CrewSignatureDance } from 'src/entities/crew-signature-dance.entity';
+import { User } from '../../entities/user.entity';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([CrewSignature, CrewSignatureDance])],
+  imports: [
+    TypeOrmModule.forFeature([CrewSignature, CrewSignatureDance, User]),
+  ],
   providers: [CrewSignatureService],
   controllers: [CrewSignatureController],
   exports: [CrewSignatureService],

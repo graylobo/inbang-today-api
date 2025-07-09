@@ -8,6 +8,7 @@ import {
 } from 'typeorm';
 import { BaseEntity } from './base.entity';
 import { Crew } from './crew.entity';
+import { User } from './user.entity';
 
 @Entity()
 export class CrewSignature extends BaseEntity {
@@ -33,4 +34,10 @@ export class CrewSignature extends BaseEntity {
     cascade: true,
   })
   dances: CrewSignatureDance[];
+
+  @ManyToOne(() => User, { nullable: true })
+  createdBy: User;
+
+  @ManyToOne(() => User, { nullable: true })
+  updatedBy: User;
 }
