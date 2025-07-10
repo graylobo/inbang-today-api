@@ -1,9 +1,16 @@
-import { Entity, PrimaryGeneratedColumn, Column, OneToMany } from 'typeorm';
+import {
+  Entity,
+  PrimaryGeneratedColumn,
+  Column,
+  OneToMany,
+  ManyToOne,
+} from 'typeorm';
 import { Streamer } from './streamer.entity';
 import { CrewRank } from './crew-rank.entity';
 import { CrewBroadcast } from './crew-broadcast.entity';
 import { CrewSignature } from './crew-signature.entity';
 import { UserCrewPermission } from './user-crew-permission.entity';
+import { User } from './user.entity';
 import { BaseEntity } from './base.entity';
 
 @Entity()
@@ -22,6 +29,12 @@ export class Crew extends BaseEntity {
 
   @Column({ nullable: true })
   signatureOverviewImageUrl: string;
+
+  @ManyToOne(() => User, { nullable: true })
+  signatureOverviewImageUpdatedBy: User;
+
+  @Column({ type: 'timestamp', nullable: true })
+  signatureOverviewImageUpdatedAt: Date;
 
   @OneToMany(() => Streamer, (member) => member.crew)
   members: Streamer[];

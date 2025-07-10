@@ -10,6 +10,7 @@ import { Crew } from '../../entities/crew.entity';
 import { CrewRank } from '../../entities/crew-rank.entity';
 import { CrewEarning } from '../../entities/crew-earning.entity';
 import { CrewBroadcast } from '../../entities/crew-broadcast.entity';
+import { User } from '../../entities/user.entity';
 
 @Injectable()
 export class CrewService {
@@ -22,6 +23,8 @@ export class CrewService {
     private crewEarningRepository: Repository<CrewEarning>,
     @InjectRepository(CrewBroadcast)
     private crewBroadcastRepository: Repository<CrewBroadcast>,
+    @InjectRepository(User)
+    private userRepository: Repository<User>,
   ) {}
 
   async findAll(): Promise<Crew[]> {
@@ -46,6 +49,10 @@ export class CrewService {
       .leftJoinAndSelect('crew.members', 'members')
       .leftJoinAndSelect('crew.ranks', 'ranks')
       .leftJoinAndSelect('members.rank', 'memberRank')
+      .leftJoinAndSelect(
+        'crew.signatureOverviewImageUpdatedBy',
+        'signatureOverviewImageUpdatedBy',
+      )
       .where('crew.id = :id', { id })
       .orderBy('ranks.level', 'ASC')
       .addOrderBy('members.name', 'ASC')
@@ -283,13 +290,29 @@ export class CrewService {
       .map((member) => member.rank.id);
   }
 
-  async updateSignatureOverviewImageUrl(crewId: number, imageUrl: string) {
+  async updateSignatureOverviewImageUrl(
+    crewId: number,
+    imageUrl: string,
+    userId?: number,
+  ) {
     const crew = await this.crewRepository.findOne({ where: { id: crewId } });
     if (!crew) {
       throw new NotFoundException(`Crew with ID ${crewId} not found`);
     }
 
     crew.signatureOverviewImageUrl = imageUrl;
+    crew.signatureOverviewImageUpdatedAt = new Date();
+
+    // 사용자 정보 업데이트
+    if (userId) {
+      const user = await this.userRepository.findOne({
+        where: { id: userId },
+      });
+      if (user) {
+        crew.signatureOverviewImageUpdatedBy = user;
+      }
+    }
+
     await this.crewRepository.save(crew);
 
     return {

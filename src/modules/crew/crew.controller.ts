@@ -10,6 +10,7 @@ import {
   Post,
   Put,
   Query,
+  Request,
   UseGuards,
 } from '@nestjs/common';
 import { JwtAuthGuard } from 'src/guards/jwt-auth.guard';
@@ -93,10 +94,13 @@ export class CrewController {
   async updateSignatureOverviewImageUrl(
     @Param('id') id: string,
     @Body() data: { imageUrl: string },
+    @Request() req,
   ) {
+    const userId = req.user?.userId;
     return await this.crewService.updateSignatureOverviewImageUrl(
       +id,
       data.imageUrl,
+      userId,
     );
   }
 }
