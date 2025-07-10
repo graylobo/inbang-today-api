@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { Repository, DataSource } from 'typeorm';
 import { CrewSignature } from '../../entities/crew-signature.entity';
 import { CrewSignatureDance } from '../../entities/crew-signature-dance.entity';
 import { User } from '../../entities/user.entity';
@@ -14,6 +14,7 @@ export class CrewSignatureService {
     private dancesRepository: Repository<CrewSignatureDance>,
     @InjectRepository(User)
     private userRepository: Repository<User>,
+    private dataSource: DataSource,
   ) {}
 
   async findAllByCrewId(crewId: number): Promise<CrewSignature[]> {
@@ -76,31 +77,59 @@ export class CrewSignatureService {
   }
 
   async update(id: number, signatureData: any, userId?: number) {
-    // 업데이트 수행자 정보 조회
-    let updatedBy = null;
-    if (userId) {
-      updatedBy = await this.userRepository.findOne({
-        where: { id: userId },
+    return await this.dataSource.transaction(async (manager) => {
+      const { dances, ...signatureInfo } = signatureData;
+
+      // 업데이트 수행자 정보 조회
+      let updatedBy = null;
+      if (userId) {
+        updatedBy = await manager.findOne(User, {
+          where: { id: userId },
+        });
+      }
+
+      // dances 필드를 제외한 시그니처 기본 정보만 업데이트
+      const updateData = {
+        ...signatureInfo,
+        crew: signatureInfo.crewId ? { id: signatureInfo.crewId } : undefined,
+        updatedBy,
+      };
+
+      await manager.update(CrewSignature, id, updateData);
+
+      // dances 처리 - 새로운 dance가 있다면 추가
+      if (dances && dances.length > 0) {
+        // 기존 시그니처 조회
+        const signature = await manager.findOne(CrewSignature, {
+          where: { id },
+          relations: ['dances'],
+        });
+
+        // 새로운 dance 찾기 (id가 없는 것들)
+        const newDances = dances.filter((dance: any) => !dance.id);
+
+        if (newDances.length > 0) {
+          const danceEntities = newDances.map((dance: any) =>
+            manager.create(CrewSignatureDance, {
+              ...dance,
+              signature,
+              createdBy: updatedBy,
+            }),
+          );
+          await manager.save(CrewSignatureDance, danceEntities);
+        }
+      }
+
+      return await manager.findOne(CrewSignature, {
+        where: { id },
+        relations: [
+          'dances',
+          'createdBy',
+          'updatedBy',
+          'dances.createdBy',
+          'dances.updatedBy',
+        ],
       });
-    }
-
-    const updateData = {
-      ...signatureData,
-      crew: signatureData.crewId ? { id: signatureData.crewId } : undefined,
-      updatedBy,
-    };
-
-    await this.signatureRepository.update(id, updateData);
-
-    return this.signatureRepository.findOne({
-      where: { id },
-      relations: [
-        'dances',
-        'createdBy',
-        'updatedBy',
-        'dances.createdBy',
-        'dances.updatedBy',
-      ],
     });
   }
 
