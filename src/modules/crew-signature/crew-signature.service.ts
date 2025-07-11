@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, ConflictException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, DataSource } from 'typeorm';
 import { CrewSignature } from '../../entities/crew-signature.entity';
@@ -33,6 +33,20 @@ export class CrewSignatureService {
 
   async create(signatureData: any, userId?: number) {
     const { dances, ...signatureInfo } = signatureData;
+
+    // 중복 체크: 동일한 크루에서 같은 별풍선 개수 시그니처 존재 여부 확인
+    const existingSignature = await this.signatureRepository.findOne({
+      where: {
+        crew: { id: signatureInfo.crewId },
+        starballoonCount: signatureInfo.starballoonCount,
+      },
+    });
+
+    if (existingSignature) {
+      throw new ConflictException(
+        `이미 별풍선 ${signatureInfo.starballoonCount}개 시그니처가 존재합니다.`,
+      );
+    }
 
     // 생성자 정보 조회
     let createdBy = null;
@@ -80,6 +94,26 @@ export class CrewSignatureService {
     return await this.dataSource.transaction(async (manager) => {
       // eslint-disable-next-line @typescript-eslint/no-unused-vars
       const { dances, signatureId, ...signatureInfo } = signatureData;
+
+      // 중복 체크: 동일한 크루에서 같은 별풍선 개수 시그니처 존재 여부 확인 (자기 자신 제외)
+      if (
+        signatureInfo.starballoonCount !== undefined &&
+        signatureInfo.crewId
+      ) {
+        const existingSignature = await manager.findOne(CrewSignature, {
+          where: {
+            crew: { id: signatureInfo.crewId },
+            starballoonCount: signatureInfo.starballoonCount,
+          },
+        });
+
+        // 자기 자신이 아닌 다른 시그니처와 중복되는지 확인
+        if (existingSignature && existingSignature.id !== id) {
+          throw new ConflictException(
+            `이미 별풍선 ${signatureInfo.starballoonCount}개 시그니처가 존재합니다.`,
+          );
+        }
+      }
 
       // 업데이트 수행자 정보 조회
       let updatedBy = null;

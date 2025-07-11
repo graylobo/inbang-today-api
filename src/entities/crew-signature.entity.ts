@@ -5,12 +5,14 @@ import {
   ManyToOne,
   OneToMany,
   PrimaryGeneratedColumn,
+  Unique,
 } from 'typeorm';
 import { BaseEntity } from './base.entity';
 import { Crew } from './crew.entity';
 import { User } from './user.entity';
 
 @Entity()
+@Unique(['crew', 'starballoonCount'])
 export class CrewSignature extends BaseEntity {
   @PrimaryGeneratedColumn()
   id: number;
