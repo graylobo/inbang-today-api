@@ -3,8 +3,6 @@ import {
   Controller,
   Delete,
   Get,
-  HttpException,
-  HttpStatus,
   Param,
   Post,
   Put,
@@ -23,28 +21,14 @@ export class CrewSignatureController {
   async findAllByCrewId(
     @Param('crewId') crewId: string,
   ): Promise<CrewSignature[]> {
-    try {
-      return await this.signatureService.findAllByCrewId(+crewId);
-    } catch {
-      throw new HttpException(
-        'Failed to fetch signatures',
-        HttpStatus.INTERNAL_SERVER_ERROR,
-      );
-    }
+    return await this.signatureService.findAllByCrewId(+crewId);
   }
 
   @UseGuards(JwtAuthGuard)
   @Post()
   async create(@Body() signatureData: any, @Request() req) {
-    try {
-      const userId = req.user?.userId;
-      return await this.signatureService.create(signatureData, userId);
-    } catch {
-      throw new HttpException(
-        'Failed to create signature',
-        HttpStatus.INTERNAL_SERVER_ERROR,
-      );
-    }
+    const userId = req.user?.userId;
+    return await this.signatureService.create(signatureData, userId);
   }
 
   @UseGuards(JwtAuthGuard)
@@ -54,27 +38,13 @@ export class CrewSignatureController {
     @Body() signatureData: any,
     @Request() req,
   ): Promise<CrewSignature> {
-    try {
-      const userId = req.user?.userId;
-      return await this.signatureService.update(+id, signatureData, userId);
-    } catch {
-      throw new HttpException(
-        'Failed to update signature',
-        HttpStatus.INTERNAL_SERVER_ERROR,
-      );
-    }
+    const userId = req.user?.userId;
+    return await this.signatureService.update(+id, signatureData, userId);
   }
 
   @UseGuards(JwtAuthGuard)
   @Delete(':id')
   async delete(@Param('id') id: string): Promise<void> {
-    try {
-      await this.signatureService.delete(+id);
-    } catch {
-      throw new HttpException(
-        'Failed to delete signature',
-        HttpStatus.INTERNAL_SERVER_ERROR,
-      );
-    }
+    await this.signatureService.delete(+id);
   }
 }
