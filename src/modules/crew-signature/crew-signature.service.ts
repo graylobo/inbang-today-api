@@ -78,7 +78,8 @@ export class CrewSignatureService {
 
   async update(id: number, signatureData: any, userId?: number) {
     return await this.dataSource.transaction(async (manager) => {
-      const { dances, ...signatureInfo } = signatureData;
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
+      const { dances, signatureId, ...signatureInfo } = signatureData;
 
       // 업데이트 수행자 정보 조회
       let updatedBy = null;
@@ -88,7 +89,7 @@ export class CrewSignatureService {
         });
       }
 
-      // dances 필드를 제외한 시그니처 기본 정보만 업데이트
+      // dances 필드와 signatureId를 제외한 시그니처 기본 정보만 업데이트
       const updateData = {
         ...signatureInfo,
         crew: signatureInfo.crewId ? { id: signatureInfo.crewId } : undefined,
@@ -97,26 +98,59 @@ export class CrewSignatureService {
 
       await manager.update(CrewSignature, id, updateData);
 
-      // dances 처리 - 새로운 dance가 있다면 추가
-      if (dances && dances.length > 0) {
-        // 기존 시그니처 조회
+      // dances 처리 - 차분 업데이트 방식
+      if (dances !== undefined) {
+        // 기존 시그니처 조회 (soft delete된 것 제외)
         const signature = await manager.findOne(CrewSignature, {
           where: { id },
           relations: ['dances'],
         });
 
-        // 새로운 dance 찾기 (id가 없는 것들)
-        const newDances = dances.filter((dance: any) => !dance.id);
+        if (signature) {
+          // 현재 DB의 춤 영상 ID 목록
+          const existingDanceIds = signature.dances.map((dance) => dance.id);
 
-        if (newDances.length > 0) {
-          const danceEntities = newDances.map((dance: any) =>
-            manager.create(CrewSignatureDance, {
-              ...dance,
-              signature,
-              createdBy: updatedBy,
-            }),
+          // 클라이언트에서 보낸 춤 영상 ID 목록 (기존 것들만)
+          const clientDanceIds = dances
+            .filter((dance: any) => dance.id)
+            .map((dance: any) => dance.id);
+
+          // 1. 삭제 대상: DB에는 있지만 클라이언트에는 없는 것들
+          const toDeleteIds = existingDanceIds.filter(
+            (existingId) => !clientDanceIds.includes(existingId),
           );
-          await manager.save(CrewSignatureDance, danceEntities);
+
+          if (toDeleteIds.length > 0) {
+            await manager.softDelete(CrewSignatureDance, toDeleteIds);
+          }
+
+          // 2. 기존 춤 영상 업데이트
+          for (const dance of dances) {
+            if (dance.id) {
+              // 기존 춤 영상 업데이트
+              await manager.update(CrewSignatureDance, dance.id, {
+                memberName: dance.memberName,
+                danceVideoUrl: dance.danceVideoUrl,
+                performedAt: dance.performedAt,
+                updatedBy,
+              });
+            }
+          }
+
+          // 3. 새로운 춤 영상 생성 (ID가 없는 것들)
+          const newDances = dances.filter((dance: any) => !dance.id);
+          if (newDances.length > 0) {
+            const danceEntities = newDances.map((dance: any) =>
+              manager.create(CrewSignatureDance, {
+                memberName: dance.memberName,
+                danceVideoUrl: dance.danceVideoUrl,
+                performedAt: dance.performedAt,
+                signature,
+                createdBy: updatedBy,
+              }),
+            );
+            await manager.save(CrewSignatureDance, danceEntities);
+          }
         }
       }
 
