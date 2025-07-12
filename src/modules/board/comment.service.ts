@@ -18,7 +18,14 @@ export class CommentService {
   async findByPostId(postId: number): Promise<Comment[]> {
     return this.commentRepository.find({
       where: { post: { id: postId } },
-      relations: ['author', 'parent', 'replies', 'replies.author'],
+      relations: [
+        'author',
+        'author.userLevel',
+        'parent',
+        'replies',
+        'replies.author',
+        'replies.author.userLevel',
+      ],
       withDeleted: true, // 삭제된 댓글도 포함하여 조회
       order: {
         createdAt: 'ASC',
@@ -54,7 +61,7 @@ export class CommentService {
   ): Promise<Comment> {
     const comment = await this.commentRepository.findOne({
       where: { id },
-      relations: ['author'],
+      relations: ['author', 'author.userLevel'],
     });
 
     if (!comment) {
@@ -78,7 +85,7 @@ export class CommentService {
     await this.commentRepository.update(id, updateData);
     return this.commentRepository.findOne({
       where: { id },
-      relations: ['author'],
+      relations: ['author', 'author.userLevel'],
     });
   }
 
@@ -176,7 +183,7 @@ export class CommentService {
   async findById(id: number): Promise<Comment> {
     const comment = await this.commentRepository.findOne({
       where: { id },
-      relations: ['author', 'post', 'post.board'],
+      relations: ['author', 'author.userLevel', 'post', 'post.board'],
     });
 
     if (!comment) {
@@ -189,7 +196,14 @@ export class CommentService {
   async findByPostIdWithDeleted(postId: number): Promise<Comment[]> {
     return this.commentRepository.find({
       where: { post: { id: postId } },
-      relations: ['author', 'parent', 'replies', 'replies.author'],
+      relations: [
+        'author',
+        'author.userLevel',
+        'parent',
+        'replies',
+        'replies.author',
+        'replies.author.userLevel',
+      ],
       withDeleted: true,
       order: {
         createdAt: 'ASC',

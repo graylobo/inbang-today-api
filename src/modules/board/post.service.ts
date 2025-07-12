@@ -39,6 +39,7 @@ export class PostService {
     const queryBuilder = this.postRepository
       .createQueryBuilder('post')
       .leftJoinAndSelect('post.author', 'author')
+      .leftJoinAndSelect('author.userLevel', 'userLevel')
       .leftJoin(
         'comment',
         'comment',
@@ -54,10 +55,11 @@ export class PostService {
         'author.id',
         'author.name',
         'author.profileImage',
+        'userLevel.level',
       ])
       .addSelect('COUNT(comment.id)', 'commentCount')
       .where('post.boardId = :boardId', { boardId })
-      .groupBy('post.id, author.id')
+      .groupBy('post.id, author.id, userLevel.id')
       .orderBy(`post.${orderKey}`, order.toUpperCase() as 'ASC' | 'DESC')
       .offset((page - 1) * perPage)
       .limit(perPage);
@@ -100,6 +102,7 @@ export class PostService {
     const queryBuilder = this.postRepository
       .createQueryBuilder('post')
       .leftJoinAndSelect('post.author', 'author')
+      .leftJoinAndSelect('author.userLevel', 'userLevel')
       .leftJoin('post.board', 'board')
       .leftJoin(
         'comment',
@@ -116,10 +119,11 @@ export class PostService {
         'author.id',
         'author.name',
         'author.profileImage',
+        'userLevel.level',
       ])
       .addSelect('COUNT(comment.id)', 'commentCount')
       .where('board.slug = :slug', { slug })
-      .groupBy('post.id, author.id')
+      .groupBy('post.id, author.id, userLevel.id')
       .orderBy(`post.${orderKey}`, order.toUpperCase() as 'ASC' | 'DESC')
       .offset((page - 1) * perPage)
       .limit(perPage);
@@ -154,7 +158,7 @@ export class PostService {
   async findById(id: number): Promise<Post> {
     const post = await this.postRepository.findOne({
       where: { id },
-      relations: ['author', 'board'],
+      relations: ['author', 'author.userLevel', 'board'],
     });
 
     if (!post) {

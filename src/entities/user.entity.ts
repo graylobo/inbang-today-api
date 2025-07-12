@@ -1,6 +1,13 @@
-import { Entity, PrimaryGeneratedColumn, Column, OneToMany } from 'typeorm';
+import {
+  Entity,
+  PrimaryGeneratedColumn,
+  Column,
+  OneToMany,
+  OneToOne,
+} from 'typeorm';
 import { BaseEntity } from './base.entity';
 import { UserCrewPermission } from './user-crew-permission.entity';
+import { UserLevel } from './user-level.entity';
 
 @Entity()
 export class User extends BaseEntity {
@@ -30,4 +37,7 @@ export class User extends BaseEntity {
 
   @OneToMany(() => UserCrewPermission, (permission) => permission.user)
   crewPermissions: UserCrewPermission[];
+
+  @OneToOne(() => UserLevel, (userLevel) => userLevel.user)
+  userLevel: UserLevel;
 }

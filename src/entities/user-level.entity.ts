@@ -1,4 +1,10 @@
-import { Entity, PrimaryGeneratedColumn, Column, ManyToOne } from 'typeorm';
+import {
+  Column,
+  Entity,
+  JoinColumn,
+  OneToOne,
+  PrimaryGeneratedColumn,
+} from 'typeorm';
 import { BaseEntity } from './base.entity';
 import { User } from './user.entity';
 
@@ -7,7 +13,8 @@ export class UserLevel extends BaseEntity {
   @PrimaryGeneratedColumn()
   id: number;
 
-  @ManyToOne(() => User, { onDelete: 'CASCADE' })
+  @OneToOne(() => User, (user) => user.userLevel, { onDelete: 'CASCADE' })
+  @JoinColumn()
   user: User;
 
   @Column({ default: 0 })
