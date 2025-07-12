@@ -15,6 +15,7 @@ import { PostLike } from './post-like.entity';
 @Entity()
 @Index('IDX_POST_BOARD_CREATED_AT', ['board', 'createdAt'])
 @Index('IDX_POST_BOARD_VIEW_COUNT', ['board', 'viewCount'])
+@Index('IDX_POST_BOARD_NOTICE', ['board', 'isNotice', 'createdAt'])
 @Index('IDX_POST_CREATED_AT', ['createdAt'])
 export class Post extends BaseEntity {
   @PrimaryGeneratedColumn()
@@ -25,6 +26,9 @@ export class Post extends BaseEntity {
 
   @Column({ type: 'text' })
   content: string;
+
+  @Column({ default: false })
+  isNotice: boolean;
 
   @ManyToOne(() => Board, (board) => board.posts)
   board: Board;

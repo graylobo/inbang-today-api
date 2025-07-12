@@ -4,6 +4,7 @@ import {
   Delete,
   Get,
   Param,
+  Patch,
   Post,
   Put,
   Query,
@@ -14,6 +15,7 @@ import {
 import { PaginationQueryDto } from 'src/common/dto/pagination.dto';
 import { BoardAuthGuard } from 'src/guards/board-auth.guard';
 import { JwtAuthGuard } from 'src/guards/jwt-auth.guard';
+import { AdminGuard } from 'src/guards/admin.guard';
 import { BoardService } from './board.service';
 import { PostService } from './post.service';
 import { CurrentUser } from 'src/modules/auth/decorators/current-user.decorator';
@@ -98,5 +100,14 @@ export class PostController {
     }
 
     return this.postService.delete(+id, password);
+  }
+
+  @Patch(':id/notice')
+  @UseGuards(AdminGuard)
+  async toggleNotice(
+    @Param('id') id: string,
+    @Body() data: { isNotice: boolean },
+  ) {
+    return this.postService.toggleNotice(+id, data.isNotice);
   }
 }

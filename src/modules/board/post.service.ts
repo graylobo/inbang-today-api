@@ -52,6 +52,7 @@ export class PostService {
         'post.ipAddress',
         'post.createdAt',
         'post.viewCount',
+        'post.isNotice',
         'author.id',
         'author.name',
         'author.profileImage',
@@ -60,7 +61,8 @@ export class PostService {
       .addSelect('COUNT(comment.id)', 'commentCount')
       .where('post.boardId = :boardId', { boardId })
       .groupBy('post.id, author.id, userLevel.id')
-      .orderBy(`post.${orderKey}`, order.toUpperCase() as 'ASC' | 'DESC')
+      .orderBy('post.isNotice', 'DESC')
+      .addOrderBy(`post.${orderKey}`, order.toUpperCase() as 'ASC' | 'DESC')
       .offset((page - 1) * perPage)
       .limit(perPage);
 
@@ -116,6 +118,7 @@ export class PostService {
         'post.ipAddress',
         'post.createdAt',
         'post.viewCount',
+        'post.isNotice',
         'author.id',
         'author.name',
         'author.profileImage',
@@ -124,7 +127,8 @@ export class PostService {
       .addSelect('COUNT(comment.id)', 'commentCount')
       .where('board.slug = :slug', { slug })
       .groupBy('post.id, author.id, userLevel.id')
-      .orderBy(`post.${orderKey}`, order.toUpperCase() as 'ASC' | 'DESC')
+      .orderBy('post.isNotice', 'DESC')
+      .addOrderBy(`post.${orderKey}`, order.toUpperCase() as 'ASC' | 'DESC')
       .offset((page - 1) * perPage)
       .limit(perPage);
 
@@ -250,5 +254,21 @@ export class PostService {
     }
 
     await this.postRepository.softDelete(id);
+  }
+
+  async toggleNotice(id: number, isNotice: boolean): Promise<Post> {
+    const post = await this.postRepository.findOne({
+      where: { id },
+      relations: ['author', 'author.userLevel', 'board'],
+    });
+
+    if (!post) {
+      throw new NotFoundException('게시글을 찾을 수 없습니다.');
+    }
+
+    post.isNotice = isNotice;
+    await this.postRepository.save(post);
+
+    return post;
   }
 }
