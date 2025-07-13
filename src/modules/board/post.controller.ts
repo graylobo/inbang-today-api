@@ -110,4 +110,25 @@ export class PostController {
   ) {
     return this.postService.toggleNotice(+id, data.isNotice);
   }
+
+  @Patch(':id/notice-order/up')
+  @UseGuards(AdminGuard)
+  async moveNoticeUp(@Param('id') id: string) {
+    return this.postService.moveNoticeUp(+id);
+  }
+
+  @Patch(':id/notice-order/down')
+  @UseGuards(AdminGuard)
+  async moveNoticeDown(@Param('id') id: string) {
+    return this.postService.moveNoticeDown(+id);
+  }
+
+  @Patch(':id/notice-order')
+  @UseGuards(AdminGuard)
+  async setNoticeOrder(
+    @Param('id') id: string,
+    @Body() data: { order: number },
+  ) {
+    return this.postService.setNoticeOrder(+id, data.order);
+  }
 }

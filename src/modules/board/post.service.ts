@@ -53,6 +53,7 @@ export class PostService {
         'post.createdAt',
         'post.viewCount',
         'post.isNotice',
+        'post.noticeOrder',
         'author.id',
         'author.name',
         'author.profileImage',
@@ -62,6 +63,7 @@ export class PostService {
       .where('post.boardId = :boardId', { boardId })
       .groupBy('post.id, author.id, userLevel.id')
       .orderBy('post.isNotice', 'DESC')
+      .addOrderBy('post.noticeOrder', 'ASC')
       .addOrderBy(`post.${orderKey}`, order.toUpperCase() as 'ASC' | 'DESC')
       .offset((page - 1) * perPage)
       .limit(perPage);
@@ -119,6 +121,7 @@ export class PostService {
         'post.createdAt',
         'post.viewCount',
         'post.isNotice',
+        'post.noticeOrder',
         'author.id',
         'author.name',
         'author.profileImage',
@@ -128,6 +131,7 @@ export class PostService {
       .where('board.slug = :slug', { slug })
       .groupBy('post.id, author.id, userLevel.id')
       .orderBy('post.isNotice', 'DESC')
+      .addOrderBy('post.noticeOrder', 'ASC')
       .addOrderBy(`post.${orderKey}`, order.toUpperCase() as 'ASC' | 'DESC')
       .offset((page - 1) * perPage)
       .limit(perPage);
@@ -267,6 +271,129 @@ export class PostService {
     }
 
     post.isNotice = isNotice;
+
+    // 공지글로 설정할 때 순서 자동 할당
+    if (isNotice && !post.noticeOrder) {
+      const maxOrder = await this.postRepository
+        .createQueryBuilder('post')
+        .where('post.boardId = :boardId', { boardId: post.board.id })
+        .andWhere('post.isNotice = true')
+        .select('MAX(post.noticeOrder)', 'maxOrder')
+        .getRawOne();
+
+      post.noticeOrder = (maxOrder?.maxOrder || 0) + 1;
+    }
+
+    await this.postRepository.save(post);
+
+    return post;
+  }
+
+  async moveNoticeUp(id: number): Promise<Post> {
+    const post = await this.postRepository.findOne({
+      where: { id },
+      relations: ['author', 'author.userLevel', 'board'],
+    });
+
+    if (!post || !post.isNotice) {
+      throw new NotFoundException('공지글을 찾을 수 없습니다.');
+    }
+
+    // 현재 순서보다 바로 위에 있는 공지글 찾기
+    const upperPost = await this.postRepository
+      .createQueryBuilder('post')
+      .where('post.boardId = :boardId', { boardId: post.board.id })
+      .andWhere('post.isNotice = true')
+      .andWhere('post.noticeOrder < :currentOrder', {
+        currentOrder: post.noticeOrder,
+      })
+      .orderBy('post.noticeOrder', 'DESC')
+      .getOne();
+
+    if (upperPost) {
+      // 순서 교환
+      const tempOrder = post.noticeOrder;
+      post.noticeOrder = upperPost.noticeOrder;
+      upperPost.noticeOrder = tempOrder;
+
+      await this.postRepository.save([post, upperPost]);
+    }
+
+    return post;
+  }
+
+  async moveNoticeDown(id: number): Promise<Post> {
+    const post = await this.postRepository.findOne({
+      where: { id },
+      relations: ['author', 'author.userLevel', 'board'],
+    });
+
+    if (!post || !post.isNotice) {
+      throw new NotFoundException('공지글을 찾을 수 없습니다.');
+    }
+
+    // 현재 순서보다 바로 아래에 있는 공지글 찾기
+    const lowerPost = await this.postRepository
+      .createQueryBuilder('post')
+      .where('post.boardId = :boardId', { boardId: post.board.id })
+      .andWhere('post.isNotice = true')
+      .andWhere('post.noticeOrder > :currentOrder', {
+        currentOrder: post.noticeOrder,
+      })
+      .orderBy('post.noticeOrder', 'ASC')
+      .getOne();
+
+    if (lowerPost) {
+      // 순서 교환
+      const tempOrder = post.noticeOrder;
+      post.noticeOrder = lowerPost.noticeOrder;
+      lowerPost.noticeOrder = tempOrder;
+
+      await this.postRepository.save([post, lowerPost]);
+    }
+
+    return post;
+  }
+
+  async setNoticeOrder(id: number, newOrder: number): Promise<Post> {
+    const post = await this.postRepository.findOne({
+      where: { id },
+      relations: ['author', 'author.userLevel', 'board'],
+    });
+
+    if (!post || !post.isNotice) {
+      throw new NotFoundException('공지글을 찾을 수 없습니다.');
+    }
+
+    const oldOrder = post.noticeOrder;
+
+    // 동일한 게시판의 다른 공지글들 순서 조정
+    if (newOrder < oldOrder) {
+      // 위로 이동하는 경우: 사이에 있는 공지글들을 한 칸씩 아래로
+      await this.postRepository
+        .createQueryBuilder()
+        .update(Post)
+        .set({ noticeOrder: () => 'noticeOrder + 1' })
+        .where('boardId = :boardId', { boardId: post.board.id })
+        .andWhere('isNotice = true')
+        .andWhere('noticeOrder >= :newOrder', { newOrder })
+        .andWhere('noticeOrder < :oldOrder', { oldOrder })
+        .execute();
+    } else if (newOrder > oldOrder) {
+      // 아래로 이동하는 경우: 사이에 있는 공지글들을 한 칸씩 위로
+      await this.postRepository
+        .createQueryBuilder()
+        .update(Post)
+        .set({ noticeOrder: () => 'noticeOrder - 1' })
+        .where('boardId = :boardId', { boardId: post.board.id })
+        .andWhere('isNotice = true')
+        .andWhere('noticeOrder > :oldOrder', { oldOrder })
+        .andWhere('noticeOrder <= :newOrder', { newOrder })
+        .execute();
+    }
+
+    // 현재 게시글 순서 설정
+    post.noticeOrder = newOrder;
     await this.postRepository.save(post);
 
     return post;

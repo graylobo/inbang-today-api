@@ -30,6 +30,9 @@ export class Post extends BaseEntity {
   @Column({ default: false })
   isNotice: boolean;
 
+  @Column({ nullable: true })
+  noticeOrder: number; // 공지글 순서 (낮은 숫자가 먼저 표시)
+
   @ManyToOne(() => Board, (board) => board.posts)
   board: Board;
 
