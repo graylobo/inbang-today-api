@@ -5,6 +5,7 @@ import { User } from 'src/entities/user.entity';
 import { Repository } from 'typeorm';
 import { ConfigService } from '@nestjs/config';
 import { S3Service } from 'src/modules/aws/services/s3/s3.service';
+import { ImageProcessingService } from 'src/modules/image-processing/image-processing.service';
 
 @Injectable()
 export class UserService {
@@ -13,6 +14,7 @@ export class UserService {
     private userRepository: Repository<User>,
     private configService: ConfigService,
     private s3Service: S3Service,
+    private imageProcessingService: ImageProcessingService,
   ) {}
 
   async create(data: Partial<User>) {
@@ -95,11 +97,21 @@ export class UserService {
       throw new NotFoundException(ErrorCode.NOT_FOUND_USER);
     }
 
-    const fileExtension = file.originalname.split('.').pop();
-    const key = `profile-images/${userId}-${Date.now()}.${fileExtension}`;
-    const bucketName = this.configService.get<string>('aws.s3BucketName');
-
     try {
+      // 이미지 처리 (Sharp로 압축 및 WebP 변환)
+      const processedImage =
+        await this.imageProcessingService.processImageByType(file, 'profile');
+
+      // 압축 결과 로깅
+      this.imageProcessingService.logCompressionResult(
+        processedImage,
+        file.originalname,
+      );
+
+      // WebP 확장자로 S3 키 생성
+      const key = `profile-images/${userId}-${Date.now()}.webp`;
+      const bucketName = this.configService.get<string>('aws.s3BucketName');
+
       // 이전 프로필 이미지가 있으면 S3에서 삭제
       if (user.profileImage) {
         try {
@@ -121,8 +133,16 @@ export class UserService {
         }
       }
 
+      // 처리된 이미지로 파일 객체 생성
+      const processedFile: Express.Multer.File = {
+        ...file,
+        buffer: processedImage.buffer,
+        mimetype: processedImage.mimetype,
+        size: processedImage.processedSize,
+      };
+
       const imageUrl = await this.s3Service.uploadFile({
-        file,
+        file: processedFile,
         bucketName,
         key,
       });
@@ -134,6 +154,11 @@ export class UserService {
         success: true,
         data: {
           profileImage: imageUrl,
+          compressionInfo: {
+            originalSize: processedImage.originalSize,
+            processedSize: processedImage.processedSize,
+            compressionRatio: processedImage.compressionRatio,
+          },
         },
       };
     } catch (error) {

@@ -131,8 +131,8 @@ export class UserController {
     @UploadedFile(
       new ParseFilePipe({
         validators: [
-          new MaxFileSizeValidator({ maxSize: 5 * 1024 * 1024 }), // 5MB
-          new FileTypeValidator({ fileType: /(jpg|jpeg|png)$/ }),
+          new MaxFileSizeValidator({ maxSize: 10 * 1024 * 1024 }), // 10MB (압축 전 원본 크기)
+          new FileTypeValidator({ fileType: /(jpg|jpeg|png|gif)$/ }),
         ],
       }),
     )
