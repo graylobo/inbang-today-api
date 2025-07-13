@@ -7,6 +7,7 @@ export interface ImageProcessingOptions {
   quality?: number;
   format?: 'webp' | 'jpeg' | 'png';
   fit?: 'cover' | 'contain' | 'fill' | 'inside' | 'outside';
+  maxSizeKB?: number; // 옵셔널 사이즈 제한
 }
 
 export interface ProcessedImage {
@@ -20,6 +21,74 @@ export interface ProcessedImage {
 @Injectable()
 export class ImageProcessingService {
   /**
+   * 크기 제한 압축 - 지정된 크기 이하가 될 때까지 품질 조정
+   */
+  private async processWithSizeLimit(
+    file: Express.Multer.File,
+    maxSizeKB: number,
+    options: ImageProcessingOptions = {},
+  ): Promise<ProcessedImage> {
+    const { width = 512, height = 512, fit = 'cover' } = options;
+
+    const maxAttempts = 8;
+    const minQuality = 20;
+    const qualityStep = 10;
+
+    // 품질 배열로 시도할 값들 미리 정의
+    const qualityLevels = [];
+    for (let q = 90; q >= minQuality; q -= qualityStep) {
+      qualityLevels.push(q);
+    }
+
+    for (let attempt = 0; attempt < maxAttempts; attempt++) {
+      const quality = qualityLevels[attempt] || minQuality;
+
+      const processedBuffer = await sharp(file.buffer)
+        .resize(width, height, { fit })
+        .webp({ quality })
+        .toBuffer();
+
+      const currentSizeKB = processedBuffer.length / 1024;
+      console.log(
+        `🔄 압축 시도 ${attempt + 1}: ${quality}% 품질 → ${currentSizeKB.toFixed(1)}KB`,
+      );
+
+      // 목표 크기 달성 시 성공 반환
+      if (processedBuffer.length <= maxSizeKB * 1024) {
+        console.log(
+          `✅ 크기 제한 성공: ${currentSizeKB.toFixed(1)}KB (목표: ${maxSizeKB}KB)`,
+        );
+        return {
+          buffer: processedBuffer,
+          mimetype: 'image/webp',
+          originalSize: file.size,
+          processedSize: processedBuffer.length,
+          compressionRatio:
+            ((file.size - processedBuffer.length) / file.size) * 100,
+        };
+      }
+
+      // 마지막 시도면 경고 후 그대로 반환
+      if (attempt === maxAttempts - 1) {
+        console.warn(
+          `⚠️  목표 크기 ${maxSizeKB}KB를 달성하지 못함. 최종 크기: ${currentSizeKB.toFixed(1)}KB`,
+        );
+        return {
+          buffer: processedBuffer,
+          mimetype: 'image/webp',
+          originalSize: file.size,
+          processedSize: processedBuffer.length,
+          compressionRatio:
+            ((file.size - processedBuffer.length) / file.size) * 100,
+        };
+      }
+    }
+
+    // 이론상 도달하지 않지만 타입 안전성을 위해
+    throw new Error('Image processing failed unexpectedly');
+  }
+
+  /**
    * 프로필 이미지 처리 - WebP 형식으로 변환 및 압축
    */
   async processProfileImage(
@@ -30,10 +99,20 @@ export class ImageProcessingService {
       width = 512,
       height = 512,
       quality = 80,
-      format = 'webp',
       fit = 'cover',
+      maxSizeKB,
     } = options;
 
+    // 크기 제한이 있는 경우 크기 제한 압축 사용
+    if (maxSizeKB) {
+      return this.processWithSizeLimit(file, maxSizeKB, {
+        width,
+        height,
+        fit,
+      });
+    }
+
+    // 기본 압축 (현재 방식 유지)
     const processedBuffer = await sharp(file.buffer)
       .resize(width, height, { fit })
       .webp({ quality })
