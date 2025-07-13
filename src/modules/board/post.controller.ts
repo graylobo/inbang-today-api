@@ -13,13 +13,13 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import { PaginationQueryDto } from 'src/common/dto/pagination.dto';
+import { User } from 'src/entities/user.entity';
 import { BoardAuthGuard } from 'src/guards/board-auth.guard';
 import { JwtAuthGuard } from 'src/guards/jwt-auth.guard';
-import { AdminGuard } from 'src/guards/admin.guard';
+import { SuperAdminGuard } from 'src/guards/super-admin.guard';
+import { CurrentUser } from 'src/modules/auth/decorators/current-user.decorator';
 import { BoardService } from './board.service';
 import { PostService } from './post.service';
-import { CurrentUser } from 'src/modules/auth/decorators/current-user.decorator';
-import { User } from 'src/entities/user.entity';
 
 @Controller('posts')
 export class PostController {
@@ -103,7 +103,7 @@ export class PostController {
   }
 
   @Patch(':id/notice')
-  @UseGuards(AdminGuard)
+  @UseGuards(SuperAdminGuard)
   async toggleNotice(
     @Param('id') id: string,
     @Body() data: { isNotice: boolean },
@@ -112,19 +112,19 @@ export class PostController {
   }
 
   @Patch(':id/notice-order/up')
-  @UseGuards(AdminGuard)
+  @UseGuards(SuperAdminGuard)
   async moveNoticeUp(@Param('id') id: string) {
     return this.postService.moveNoticeUp(+id);
   }
 
   @Patch(':id/notice-order/down')
-  @UseGuards(AdminGuard)
+  @UseGuards(SuperAdminGuard)
   async moveNoticeDown(@Param('id') id: string) {
     return this.postService.moveNoticeDown(+id);
   }
 
   @Patch(':id/notice-order')
-  @UseGuards(AdminGuard)
+  @UseGuards(SuperAdminGuard)
   async setNoticeOrder(
     @Param('id') id: string,
     @Body() data: { order: number },
