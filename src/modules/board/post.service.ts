@@ -272,16 +272,21 @@ export class PostService {
 
     post.isNotice = isNotice;
 
-    // 공지글로 설정할 때 순서 자동 할당
-    if (isNotice && !post.noticeOrder) {
-      const maxOrder = await this.postRepository
-        .createQueryBuilder('post')
-        .where('post.boardId = :boardId', { boardId: post.board.id })
-        .andWhere('post.isNotice = true')
-        .select('MAX(post.noticeOrder)', 'maxOrder')
-        .getRawOne();
+    if (isNotice) {
+      // 공지글로 설정할 때 순서 자동 할당
+      if (!post.noticeOrder) {
+        const maxOrder = await this.postRepository
+          .createQueryBuilder('post')
+          .where('post.boardId = :boardId', { boardId: post.board.id })
+          .andWhere('post.isNotice = true')
+          .select('MAX(post.noticeOrder)', 'maxOrder')
+          .getRawOne();
 
-      post.noticeOrder = (maxOrder?.maxOrder || 0) + 1;
+        post.noticeOrder = (maxOrder?.maxOrder || 0) + 1;
+      }
+    } else {
+      // 공지 해제할 때 순서 초기화
+      post.noticeOrder = null;
     }
 
     await this.postRepository.save(post);
