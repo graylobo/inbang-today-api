@@ -42,7 +42,12 @@ export class AuthService {
 
     console.log('Login User:', currentUser);
 
-    const payload = { name: currentUser.name, sub: currentUser.id };
+    const payload = {
+      name: currentUser.name,
+      sub: currentUser.id,
+      isAdmin: currentUser.isAdmin,
+      isSuperAdmin: currentUser.isSuperAdmin,
+    };
     console.log('Token Payload:', payload);
     console.log('JWT Secret:', process.env.JWT_SECRET);
 
@@ -181,6 +186,8 @@ export class AuthService {
       email: user.email,
       sub: user.id,
       name: user.name,
+      isAdmin: user.isAdmin,
+      isSuperAdmin: user.isSuperAdmin,
     };
     return this.jwtService.sign(payload);
   }

@@ -52,6 +52,7 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
       sub: user.id, // sub 필드 추가 (컨트롤러에서 req.user.sub로 접근)
       name: user.name,
       isAdmin: user.isAdmin,
+      isSuperAdmin: user.isSuperAdmin,
     };
   }
 }
