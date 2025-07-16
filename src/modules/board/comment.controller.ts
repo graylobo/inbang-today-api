@@ -29,6 +29,11 @@ export class CommentController {
     return this.commentService.findByPostId(+postId);
   }
 
+  @Get('post/:postId/best')
+  async findBestCommentsByPostId(@Param('postId') postId: string) {
+    return this.commentService.findBestCommentsByPostId(+postId);
+  }
+
   @Post()
   @UseGuards(JwtAuthGuard)
   async create(@Body() commentData: any, @Request() req: any) {

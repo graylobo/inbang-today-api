@@ -4,7 +4,7 @@ import {
   UnauthorizedException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { Repository, MoreThanOrEqual } from 'typeorm';
 import { Comment } from '../../entities/comment.entity';
 import * as bcrypt from 'bcrypt';
 
@@ -235,5 +235,24 @@ export class CommentService {
     }
 
     return this.findById(id);
+  }
+
+  async findBestCommentsByPostId(postId: number): Promise<Comment[]> {
+    return this.commentRepository.find({
+      where: {
+        post: { id: postId },
+        parent: null, // 최상위 댓글만
+        likeCount: MoreThanOrEqual(1), // 좋아요 10개 이상
+      },
+      relations: [
+        'author',
+        'author.userLevel',
+        'replies',
+        'replies.author',
+        'replies.author.userLevel',
+      ],
+      order: { likeCount: 'DESC' }, // 좋아요순 내림차순
+      take: 3, // 최대 3개
+    });
   }
 }
