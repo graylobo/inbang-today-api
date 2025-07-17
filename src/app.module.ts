@@ -52,7 +52,10 @@ import { CrewMemberHistory } from './entities/crew-member-history.entity';
 import { CrewMemberHistoryModule } from './modules/crew-member-history/crew-member-history.module';
 import { StreamerEloRecord } from './entities/streamer-elo-record.entity';
 import { EloRankingModule } from './modules/elo-ranking/elo-ranking.module';
-import { SoopAuthModule } from './modules/soop-auth/soop-auth.module';
+import { Platform } from './entities/platform.entity';
+import { UserPlatformVerification } from './entities/user-platform-verification.entity';
+import { PlatformVerificationModule } from './modules/platform-verification/platform-verification.module';
+import { PlatformModule } from './modules/platform/platform.module';
 
 @Module({
   imports: [
@@ -124,6 +127,8 @@ import { SoopAuthModule } from './modules/soop-auth/soop-auth.module';
         PurchasePointHistory,
         CrewMemberHistory,
         StreamerEloRecord,
+        Platform,
+        UserPlatformVerification,
       ],
       synchronize: process.env.NODE_ENV !== 'production', // 운영에서는 false
     }),
@@ -151,7 +156,8 @@ import { SoopAuthModule } from './modules/soop-auth/soop-auth.module';
     PointsModule,
     CrewMemberHistoryModule,
     EloRankingModule,
-    SoopAuthModule,
+    PlatformVerificationModule,
+    PlatformModule,
   ],
   controllers: [AppController],
   providers: [AppService],

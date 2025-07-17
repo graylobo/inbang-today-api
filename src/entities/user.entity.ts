@@ -8,6 +8,7 @@ import {
 import { BaseEntity } from './base.entity';
 import { UserCrewPermission } from './user-crew-permission.entity';
 import { UserLevel } from './user-level.entity';
+import { UserPlatformVerification } from './user-platform-verification.entity';
 
 @Entity()
 export class User extends BaseEntity {
@@ -41,19 +42,9 @@ export class User extends BaseEntity {
   @OneToOne(() => UserLevel, (userLevel) => userLevel.user)
   userLevel: UserLevel;
 
-  // 숲 인증 관련 필드
-  @Column({ nullable: true })
-  soopUsername: string;
-
-  @Column({ nullable: true })
-  soopAuthCode: string;
-
-  @Column({ nullable: true })
-  soopAuthCodeGeneratedAt: Date;
-
-  @Column({ default: false })
-  soopVerified: boolean;
-
-  @Column({ nullable: true })
-  soopVerifiedAt: Date;
+  @OneToMany(
+    () => UserPlatformVerification,
+    (verification) => verification.user,
+  )
+  platformVerifications: UserPlatformVerification[];
 }
