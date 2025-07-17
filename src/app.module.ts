@@ -52,6 +52,7 @@ import { CrewMemberHistory } from './entities/crew-member-history.entity';
 import { CrewMemberHistoryModule } from './modules/crew-member-history/crew-member-history.module';
 import { StreamerEloRecord } from './entities/streamer-elo-record.entity';
 import { EloRankingModule } from './modules/elo-ranking/elo-ranking.module';
+import { SoopAuthModule } from './modules/soop-auth/soop-auth.module';
 
 @Module({
   imports: [
@@ -150,6 +151,7 @@ import { EloRankingModule } from './modules/elo-ranking/elo-ranking.module';
     PointsModule,
     CrewMemberHistoryModule,
     EloRankingModule,
+    SoopAuthModule,
   ],
   controllers: [AppController],
   providers: [AppService],

@@ -40,4 +40,20 @@ export class User extends BaseEntity {
 
   @OneToOne(() => UserLevel, (userLevel) => userLevel.user)
   userLevel: UserLevel;
+
+  // 숲 인증 관련 필드
+  @Column({ nullable: true })
+  soopUsername: string;
+
+  @Column({ nullable: true })
+  soopAuthCode: string;
+
+  @Column({ nullable: true })
+  soopAuthCodeGeneratedAt: Date;
+
+  @Column({ default: false })
+  soopVerified: boolean;
+
+  @Column({ nullable: true })
+  soopVerifiedAt: Date;
 }
