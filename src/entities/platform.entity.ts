@@ -1,6 +1,7 @@
 import { Entity, PrimaryGeneratedColumn, Column, OneToMany } from 'typeorm';
 import { BaseEntity } from './base.entity';
 import { UserPlatformVerification } from 'src/entities/user-platform-verification.entity';
+import { StreamerPlatform } from './streamer-platform.entity';
 
 @Entity()
 export class Platform extends BaseEntity {
@@ -24,4 +25,10 @@ export class Platform extends BaseEntity {
     (verification) => verification.platform,
   )
   verifications: UserPlatformVerification[];
+
+  @OneToMany(
+    () => StreamerPlatform,
+    (streamerPlatform) => streamerPlatform.platform,
+  )
+  streamers: StreamerPlatform[];
 }

@@ -54,6 +54,9 @@ import { StreamerEloRecord } from './entities/streamer-elo-record.entity';
 import { EloRankingModule } from './modules/elo-ranking/elo-ranking.module';
 import { Platform } from './entities/platform.entity';
 import { UserPlatformVerification } from './entities/user-platform-verification.entity';
+import { StreamerPlatform } from './entities/streamer-platform.entity';
+import { StreamerProfile } from './entities/streamer-profile.entity';
+import { StreamerGameProfile } from './entities/streamer-game-profile.entity';
 import { PlatformVerificationModule } from './modules/platform-verification/platform-verification.module';
 import { PlatformModule } from './modules/platform/platform.module';
 
@@ -129,6 +132,10 @@ import { PlatformModule } from './modules/platform/platform.module';
         StreamerEloRecord,
         Platform,
         UserPlatformVerification,
+        StreamerPlatform,
+        StreamerProfile,
+        StreamerGameProfile,
+        Platform,
       ],
       synchronize: process.env.NODE_ENV !== 'production', // 운영에서는 false
     }),

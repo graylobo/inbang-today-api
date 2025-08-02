@@ -50,9 +50,7 @@ export class CrewController {
   @Get()
   async findAll(): Promise<Crew[]> {
     try {
-      const crews = await this.crewService.findAll();
-      console.log('Found crews:', JSON.stringify(crews, null, 2));
-      return crews;
+      return await this.crewService.findAll();
     } catch (error) {
       console.error('Error fetching crews:', error);
       throw new HttpException(

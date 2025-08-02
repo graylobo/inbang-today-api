@@ -7,6 +7,8 @@ import { Streamer } from 'src/entities/streamer.entity';
 import { Category } from 'src/entities/category.entity';
 import { StreamerCategory } from 'src/entities/streamer-category.entity';
 import { StreamerEloRecord } from 'src/entities/streamer-elo-record.entity';
+import { Platform } from 'src/entities/platform.entity';
+import { StreamerPlatform } from 'src/entities/streamer-platform.entity';
 import { LiveStreamGateway } from 'src/gateway/live-streamer.gateway';
 import { CrawlerController } from 'src/modules/crawler/crawler.controller';
 import { CrawlerService } from 'src/modules/crawler/crawler.service';
@@ -23,6 +25,8 @@ import { Crew } from 'src/entities/crew.entity';
       Category,
       StreamerCategory,
       Crew,
+      Platform,
+      StreamerPlatform,
     ]),
     RedisModule,
     HttpModule,

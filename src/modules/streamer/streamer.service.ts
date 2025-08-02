@@ -10,6 +10,9 @@ import { Streamer } from '../../entities/streamer.entity';
 import { StreamerCategoryService } from '../category/streamer-category.service';
 import { In } from 'typeorm';
 import { CrewRank } from '../../entities/crew-rank.entity';
+import { Crew } from '../../entities/crew.entity';
+import { Platform } from '../../entities/platform.entity';
+import { StreamerPlatform } from '../../entities/streamer-platform.entity';
 import { ILike } from 'typeorm';
 
 @Injectable()
@@ -19,20 +22,27 @@ export class StreamerService {
     private streamerRepository: Repository<Streamer>,
     @InjectRepository(CrewRank)
     private crewRankRepository: Repository<CrewRank>,
+    @InjectRepository(Crew)
+    private crewRepository: Repository<Crew>,
+    @InjectRepository(Platform)
+    private platformRepository: Repository<Platform>,
+    @InjectRepository(StreamerPlatform)
+    private streamerPlatformRepository: Repository<StreamerPlatform>,
     private streamerCategoryService: StreamerCategoryService,
   ) {}
 
   async findAll(): Promise<Streamer[]> {
     return this.streamerRepository.find({
       relations: [
-        'crew',
-        'rank',
+        'platforms',
+        'platforms.platform',
+        'platforms.crew',
+        'platforms.crewRank',
         'streamerCategories',
         'streamerCategories.category',
       ],
       order: {
-        crew: { name: 'ASC' },
-        rank: { level: 'ASC' },
+        name: 'ASC',
       },
     });
   }
@@ -58,24 +68,36 @@ export class StreamerService {
     // 해당 ID에 해당하는 모든 스트리머 정보 조회 (관계 포함)
     return this.streamerRepository.find({
       where: { id: In(streamerIds) },
-      relations: ['crew', 'rank'],
+      relations: [
+        'platforms',
+        'platforms.platform',
+        'platforms.crew',
+        'platforms.crewRank',
+        'streamerCategories',
+        'streamerCategories.category',
+      ],
       order: {
-        crew: { name: 'ASC' },
-        rank: { level: 'ASC' },
+        name: 'ASC',
       },
     });
   }
 
   async findAllByCrewId(crewId: number): Promise<Streamer[]> {
     return this.streamerRepository.find({
-      where: { crew: { id: crewId } },
+      where: {
+        platforms: {
+          crew: { id: crewId },
+        },
+      },
       relations: [
-        'rank',
-        'crew',
+        'platforms',
+        'platforms.platform',
+        'platforms.crew',
+        'platforms.crewRank',
         'streamerCategories',
         'streamerCategories.category',
       ],
-      order: { rank: { level: 'ASC' } },
+      order: { name: 'ASC' },
     });
   }
 
@@ -83,21 +105,29 @@ export class StreamerService {
     return this.streamerRepository.findOne({
       where: { id },
       relations: [
-        'rank',
-        'crew',
+        'platforms',
+        'platforms.platform',
+        'platforms.crew',
+        'platforms.crewRank',
         'streamerCategories',
         'streamerCategories.category',
       ],
     });
   }
 
-  // 스트리머 검색 (이름 또는 숲ID로 검색)
+  // 스트리머 검색 (이름 또는 플랫폼 ID로 검색)
   async searchStreamers(query: string): Promise<Streamer[]> {
     return this.streamerRepository.find({
-      where: [{ name: ILike(`%${query}%`) }, { soopId: ILike(`%${query}%`) }],
+      where: [
+        { name: ILike(`%${query}%`) },
+        { nickname: ILike(`%${query}%`) },
+        { platforms: { platformStreamerId: ILike(`%${query}%`) } },
+      ],
       relations: [
-        'rank',
-        'crew',
+        'platforms',
+        'platforms.platform',
+        'platforms.crew',
+        'platforms.crewRank',
         'streamerCategories',
         'streamerCategories.category',
       ],
@@ -108,52 +138,53 @@ export class StreamerService {
   }
 
   async create(memberData: any): Promise<Streamer> {
-    // 이름 또는 soopId로 기존 스트리머 검색 (더 정확한 검색)
-    const query: any = {};
-    if (memberData.name) query.name = memberData.name;
-    if (memberData.soopId) query.soopId = memberData.soopId;
-
-    // 두 값 중 하나라도 있으면 검색 진행
+    // 이름으로 기존 스트리머 검색
     let streamer: Streamer = null;
-    if (Object.keys(query).length > 0) {
+    if (memberData.name) {
       streamer = await this.streamerRepository.findOne({
-        where: query,
-        relations: ['crew', 'rank'],
+        where: { name: memberData.name },
+        relations: [
+          'platforms',
+          'platforms.platform',
+          'platforms.crew',
+          'platforms.crewRank',
+        ],
       });
     }
 
     if (streamer) {
-      // 이미 동일한 크루에 속해있는지 확인
+      // 이미 동일한 크루에 속해있는지 확인 (soop 플랫폼 기준)
+      const soopPlatform = streamer.platforms?.find(
+        (p) => p.platform?.name === 'soop',
+      );
       if (
-        streamer.crew &&
+        soopPlatform?.crew &&
         memberData.crewId &&
-        streamer.crew.id === memberData.crewId
+        soopPlatform.crew.id === memberData.crewId
       ) {
         throw new ConflictException(
           `스트리머 "${streamer.name}"은(는) 이미 해당 크루에 소속되어 있습니다.`,
         );
       }
 
-      // 이미 등록된 스트리머면 크루와 랭크 정보만 업데이트
-      if (memberData.crewId) {
-        streamer.crew = { id: memberData.crewId } as any;
-      }
-
-      if (memberData.rankId) {
-        streamer.rank = { id: memberData.rankId } as any;
+      // 이미 등록된 스트리머면 플랫폼 정보 업데이트
+      if (memberData.crewId || memberData.rankId || memberData.soopId) {
+        await this.updateStreamerPlatform(streamer.id, memberData);
       }
     } else {
       // 새로운 스트리머 생성
       streamer = this.streamerRepository.create({
         name: memberData.name,
-        soopId: memberData.soopId,
-        crew: memberData.crewId ? { id: memberData.crewId } : null,
-        rank: memberData.rankId ? { id: memberData.rankId } : null,
+        nickname: memberData.nickname,
       });
-    }
 
-    // 스트리머 저장
-    streamer = await this.streamerRepository.save(streamer);
+      streamer = await this.streamerRepository.save(streamer);
+
+      // 플랫폼 정보 생성
+      if (memberData.crewId || memberData.rankId || memberData.soopId) {
+        await this.updateStreamerPlatform(streamer.id, memberData);
+      }
+    }
 
     // 카테고리가 제공된 경우, 카테고리 설정
     if (memberData.categoryIds?.length > 0) {
@@ -169,6 +200,78 @@ export class StreamerService {
     return streamer;
   }
 
+  private async updateStreamerPlatform(
+    streamerId: number,
+    memberData: any,
+  ): Promise<void> {
+    // soop 플랫폼 찾기
+    const soopPlatform = await this.platformRepository.findOne({
+      where: { name: 'soop' },
+    });
+
+    if (!soopPlatform) {
+      throw new InternalServerErrorException('Soop 플랫폼을 찾을 수 없습니다.');
+    }
+
+    // 기존 플랫폼 정보 찾기
+    let streamerPlatform = await this.streamerPlatformRepository.findOne({
+      where: {
+        streamer: { id: streamerId },
+        platform: { id: soopPlatform.id },
+      },
+      relations: ['crew', 'crewRank'],
+    });
+
+    if (streamerPlatform) {
+      // 기존 정보 업데이트
+      if (memberData.crewId) {
+        const crew = await this.crewRepository.findOne({
+          where: { id: memberData.crewId },
+        });
+        if (crew) streamerPlatform.crew = crew;
+      }
+      if (memberData.rankId) {
+        const crewRank = await this.crewRankRepository.findOne({
+          where: { id: memberData.rankId },
+        });
+        if (crewRank) streamerPlatform.crewRank = crewRank;
+      }
+      if (memberData.soopId)
+        streamerPlatform.platformStreamerId = memberData.soopId;
+    } else {
+      // 새로운 플랫폼 정보 생성
+      const streamer = await this.streamerRepository.findOne({
+        where: { id: streamerId },
+      });
+      if (!streamer) {
+        throw new NotFoundException('Streamer not found');
+      }
+
+      streamerPlatform = this.streamerPlatformRepository.create({
+        streamer,
+        platform: soopPlatform,
+        platformStreamerId: memberData.soopId,
+        platformUsername: memberData.name,
+      });
+
+      // crew와 crewRank 설정
+      if (memberData.crewId) {
+        const crew = await this.crewRepository.findOne({
+          where: { id: memberData.crewId },
+        });
+        if (crew) streamerPlatform.crew = crew;
+      }
+      if (memberData.rankId) {
+        const crewRank = await this.crewRankRepository.findOne({
+          where: { id: memberData.rankId },
+        });
+        if (crewRank) streamerPlatform.crewRank = crewRank;
+      }
+    }
+
+    await this.streamerPlatformRepository.save(streamerPlatform);
+  }
+
   async update(id: number, memberData: any): Promise<Streamer> {
     const member = await this.findOne(id);
     if (!member) {
@@ -177,15 +280,15 @@ export class StreamerService {
 
     // 기본 정보 업데이트
     if (memberData.name) member.name = memberData.name;
-    if (memberData.soopId !== undefined) member.soopId = memberData.soopId;
-    if (memberData.crewId) member.crew = { id: memberData.crewId } as any;
-    if (memberData.rankId) member.rank = { id: memberData.rankId } as any;
     if (memberData.nickname !== undefined)
       member.nickname = memberData.nickname;
-    if (memberData.race !== undefined) member.race = memberData.race;
-    if (memberData.tier !== undefined) member.tier = memberData.tier;
 
     const updatedMember = await this.streamerRepository.save(member);
+
+    // 플랫폼 정보 업데이트
+    if (memberData.crewId || memberData.rankId || memberData.soopId) {
+      await this.updateStreamerPlatform(id, memberData);
+    }
 
     // 카테고리 업데이트 (제공된 경우)
     if (memberData.categoryIds) {
@@ -234,14 +337,14 @@ export class StreamerService {
     return this.streamerRepository.find({
       where: { id: In(streamerIds) },
       relations: [
-        'rank',
-        'crew',
+        'platforms',
+        'platforms.crew',
+        'platforms.crewRank',
         'streamerCategories',
         'streamerCategories.category',
       ],
       order: {
-        crew: { name: 'ASC' },
-        rank: { level: 'ASC' },
+        name: 'ASC',
       },
     });
   }
@@ -304,17 +407,20 @@ export class StreamerService {
       throw new NotFoundException(`Member with ID ${id} not found`);
     }
 
-    // If member is not in a crew, there's nothing to do
-    if (!member.crew) {
-      return member;
+    // Find soop platform info
+    const soopPlatform = member.platforms?.find(
+      (p) => p.platform?.name === 'soop',
+    );
+    if (!soopPlatform || !soopPlatform.crew) {
+      return member; // Not in a crew
     }
 
     // Remove the member from the crew
-    member.crew = null;
-    member.rank = null; // Also remove their rank as it's tied to the crew
+    soopPlatform.crew = null;
+    soopPlatform.crewRank = null;
+    await this.streamerPlatformRepository.save(soopPlatform);
 
-    // Save the changes
-    return this.streamerRepository.save(member);
+    return this.findOne(id);
   }
 
   // 스트리머를 특정 크루에 입사시키는 메서드
@@ -328,13 +434,10 @@ export class StreamerService {
       throw new NotFoundException(`Streamer with ID ${streamerId} not found`);
     }
 
-    // 크루 정보 업데이트
-    streamer.crew = { id: crewId } as any;
-    if (rankId) {
-      streamer.rank = { id: rankId } as any;
-    }
+    // 플랫폼 정보 업데이트
+    await this.updateStreamerPlatform(streamerId, { crewId, rankId });
 
-    return this.streamerRepository.save(streamer);
+    return this.findOne(streamerId);
   }
 
   // 스트리머를 크루에서 퇴사시키는 메서드 (removeFromCrew와 비슷하지만 분리)
@@ -346,18 +449,22 @@ export class StreamerService {
       );
     }
 
-    // 크루에 속해있지 않은 경우
-    if (!streamer.crew) {
+    // Find soop platform info
+    const soopPlatform = streamer.platforms?.find(
+      (p) => p.platform?.name === 'soop',
+    );
+    if (!soopPlatform || !soopPlatform.crew) {
       throw new ConflictException(
         `해당 스트리머는 이미 크루에 속해있지 않습니다.`,
       );
     }
 
     // 크루 및 직급 정보 제거
-    streamer.crew = null;
-    streamer.rank = null;
+    soopPlatform.crew = null;
+    soopPlatform.crewRank = null;
+    await this.streamerPlatformRepository.save(soopPlatform);
 
-    return this.streamerRepository.save(streamer);
+    return this.findOne(streamerId);
   }
 
   /**
@@ -374,8 +481,11 @@ export class StreamerService {
       );
     }
 
-    // 크루에 속해있지 않은 경우
-    if (!streamer.crew) {
+    // Find soop platform info
+    const soopPlatform = streamer.platforms?.find(
+      (p) => p.platform?.name === 'soop',
+    );
+    if (!soopPlatform || !soopPlatform.crew) {
       throw new ConflictException(
         `크루에 속해있지 않은 스트리머의 직급을 변경할 수 없습니다.`,
       );
@@ -383,7 +493,7 @@ export class StreamerService {
 
     // 새 직급 ID가 없는 경우
     if (!newRankId) {
-      throw new ConflictException(`새 직급 ID가.유효하지 않습니다.`);
+      throw new ConflictException(`새 직급 ID가 유효하지 않습니다.`);
     }
 
     // 새 직급 정보 조회
@@ -397,15 +507,16 @@ export class StreamerService {
     }
 
     // 해당 직급이 스트리머의 현재 크루에 속하는지 확인
-    if (newRank.crew.id !== streamer.crew.id) {
+    if (newRank.crew.id !== soopPlatform.crew.id) {
       throw new ConflictException(
         `선택한 직급은 스트리머의 현재 크루에 속하지 않습니다.`,
       );
     }
 
     // 직급 변경
-    streamer.rank = newRank;
+    soopPlatform.crewRank = newRank;
+    await this.streamerPlatformRepository.save(soopPlatform);
 
-    return this.streamerRepository.save(streamer);
+    return this.findOne(streamerId);
   }
 }

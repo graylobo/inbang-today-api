@@ -5,8 +5,8 @@ import {
   ManyToOne,
   OneToMany,
 } from 'typeorm';
-import { Streamer } from './streamer.entity';
 import { Crew } from './crew.entity';
+import { StreamerPlatform } from './streamer-platform.entity';
 
 @Entity()
 export class CrewRank {
@@ -24,6 +24,6 @@ export class CrewRank {
   })
   crew: Crew;
 
-  @OneToMany(() => Streamer, (member) => member.rank)
-  members: Streamer[];
+  @OneToMany(() => StreamerPlatform, (member) => member.crewRank)
+  platformMembers: StreamerPlatform[];
 }

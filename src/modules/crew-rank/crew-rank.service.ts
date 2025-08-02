@@ -14,7 +14,7 @@ export class CrewRankService {
     return this.crewRankRepository.find({
       where: { crew: { id: crewId } },
       order: { level: 'ASC' },
-      relations: ['members'],
+      relations: ['platformMembers'],
     });
   }
 
@@ -27,11 +27,11 @@ export class CrewRankService {
     await this.crewRankRepository.update(id, rankData);
     return this.crewRankRepository.findOne({
       where: { id },
-      relations: ['members'],
+      relations: ['platformMembers'],
     });
   }
 
   async delete(id: number): Promise<void> {
     await this.crewRankRepository.delete(id);
   }
-} 
+}

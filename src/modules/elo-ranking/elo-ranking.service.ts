@@ -7,12 +7,15 @@ import {
   StreamerRankItemDto,
 } from './dto/monthly-ranking-response.dto';
 import { StreamerGender } from 'src/entities/types/streamer.type';
+import { Platform } from 'src/entities/platform.entity';
 
 @Injectable()
 export class EloRankingService {
   constructor(
     @InjectRepository(StreamerEloRecord)
     private readonly streamerEloRecordRepository: Repository<StreamerEloRecord>,
+    @InjectRepository(Platform)
+    private readonly platformRepository: Repository<Platform>,
   ) {}
 
   /**
@@ -28,12 +31,14 @@ export class EloRankingService {
     const query = this.streamerEloRecordRepository
       .createQueryBuilder('record')
       .leftJoinAndSelect('record.streamer', 'streamer')
-      .leftJoinAndSelect('streamer.crew', 'crew')
+      .leftJoinAndSelect('streamer.platforms', 'platforms')
+      .leftJoinAndSelect('streamer.profile', 'profile')
+      .leftJoinAndSelect('streamer.gameProfiles', 'gameProfiles')
       .where('record.month = :month', { month });
 
     // 성별 필터 적용 (선택적)
     if (gender) {
-      query.andWhere('streamer.gender = :gender', { gender });
+      query.andWhere('profile.gender = :gender', { gender });
     }
 
     // 쿼리 실행
@@ -43,20 +48,29 @@ export class EloRankingService {
     const rankings: StreamerRankItemDto[] = records.map((record, index) => {
       const { streamer } = record;
 
+      // soop 플랫폼 정보 찾기
+      const soopPlatform = streamer.platforms?.find(
+        (p) => p.platform?.name === 'soop',
+      );
+      const starcraftProfile = streamer.gameProfiles?.find(
+        (p) => p.gameType === 'starcraft',
+      );
+      const crew = soopPlatform?.crew;
+
       return {
         id: streamer.id,
         name: streamer.name,
         nickname: streamer.nickname,
-        soopId: streamer.soopId,
-        tier: streamer.tier,
-        race: streamer.race,
-        gender: streamer.gender,
+        soopId: soopPlatform?.platformStreamerId,
+        tier: starcraftProfile?.tier,
+        race: starcraftProfile?.race,
+        gender: streamer.profile?.gender,
         eloPoint: record.eloPoint,
         rank: index + 1, // 순위는 0부터 시작하므로 +1
-        crew: streamer.crew
+        crew: crew
           ? {
-              id: streamer.crew.id,
-              name: streamer.crew.name,
+              id: crew.id,
+              name: crew.name,
             }
           : undefined,
       };

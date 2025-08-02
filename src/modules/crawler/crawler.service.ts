@@ -6,6 +6,8 @@ import { Browser, chromium } from 'playwright';
 import { firstValueFrom } from 'rxjs';
 import { Category } from 'src/entities/category.entity';
 import { Crew } from 'src/entities/crew.entity';
+import { Platform } from 'src/entities/platform.entity';
+import { StreamerPlatform } from 'src/entities/streamer-platform.entity';
 import { StarCraftGameMatchHistory } from 'src/entities/starcraft-game-match-history.entity';
 import {
   MatchOrigin,
@@ -51,6 +53,10 @@ export class CrawlerService {
     private readonly starCraftGameMatchRepository: Repository<StarCraftGameMatch>,
     @InjectRepository(Category)
     private readonly categoryRepository: Repository<Category>,
+    @InjectRepository(Platform)
+    private readonly platformRepository: Repository<Platform>,
+    @InjectRepository(StreamerPlatform)
+    private readonly streamerPlatformRepository: Repository<StreamerPlatform>,
     private readonly streamerCategoryService: StreamerCategoryService,
     private readonly redisService: RedisService,
     private readonly httpService: HttpService,
@@ -491,9 +497,9 @@ export class CrawlerService {
     }
 
     // Extract soopIds from crew members
-    const crewSoopIds = crew.members
-      .filter((member) => member.soopId)
-      .map((member) => member.soopId);
+    const crewSoopIds = crew.platformMembers
+      .filter((member) => member.platformStreamerId)
+      .map((member) => member.platformStreamerId);
 
     // Filter streams based on crew soopIds
     return streams.filter((stream) => {
@@ -873,30 +879,44 @@ export class CrawlerService {
       const streamersInfo = await this.getAllStreamersInfo();
       console.log(`크롤링된 스트리머 수: ${streamersInfo.size}`);
 
-      // DB의 모든 스트리머 조회
+      // DB의 모든 스트리머 조회 (soopId가 없는 스트리머만 조회)
       const streamers = await this.streamerRepository.find({
-        where: {
-          soopId: IsNull(), // soopId가 없는 스트리머만 조회하거나
-          // soopId: Any  // 모든 스트리머를 조회할 경우
-        },
+        relations: ['platforms'],
       });
+
+      // soopId가 없는 스트리머만 필터링
+      const streamersWithoutSoopId = streamers.filter(
+        (streamer) =>
+          !streamer.platforms.some(
+            (platform) =>
+              platform.platformStreamerId && platform.platform.name === 'soop',
+          ),
+      );
 
       console.log(`DB의 스트리머 수: ${streamers.length}`);
 
       // 각 스트리머 정보 업데이트
-      for (const streamer of streamers) {
+      for (const streamer of streamersWithoutSoopId) {
         const soopId = streamersInfo.get(streamer.name);
 
         if (soopId) {
-          await this.streamerRepository.update(
-            { id: streamer.id },
-            {
-              soopId,
-            },
-          );
-          console.log(
-            `✅ ${streamer.name}의 soopId를 ${soopId}로 업데이트 완료`,
-          );
+          // Platform 정보 찾기
+          const soopPlatform = await this.platformRepository.findOne({
+            where: { name: 'soop' },
+          });
+
+          if (soopPlatform) {
+            // StreamerPlatform 생성
+            await this.streamerPlatformRepository.save({
+              streamerId: streamer.id,
+              platformId: soopPlatform.id,
+              platformStreamerId: soopId,
+              platformUsername: streamer.name,
+            });
+            console.log(
+              `✅ ${streamer.name}의 soopId를 ${soopId}로 업데이트 완료`,
+            );
+          }
         } else {
           console.log(`❌ ${streamer.name}의 soopId를 찾을 수 없음`);
         }
@@ -957,21 +977,27 @@ export class CrawlerService {
 
       // 모든 크루 정보 가져오기
       const crews = await this.crewRepository.find({
-        relations: ['members', 'members.rank'],
+        relations: ['platformMembers', 'platformMembers.crewRank'],
       });
 
       // 각 크루별로 라이브 스트리머 정보 계산
       const crewsInfo = await Promise.all(
         crews.map(async (crew) => {
-          // 크루원 ID 목록 추출
-          const memberIds = crew.members
-            .map((member) => member.soopId)
+          // 크루원 ID 목록 추출 (soop 플랫폼)
+          const memberIds = crew.platformMembers
+            .filter((member) => member.platform.name === 'soop')
+            .map((member) => member.platformStreamerId)
             .filter(Boolean);
 
           // 대표 스트리머 찾기 (rank.level === 1인 멤버들)
-          const representativeMemberIds = crew.members
-            .filter((member) => member.rank?.level === 1 && member.soopId)
-            .map((member) => member.soopId);
+          const representativeMemberIds = crew.platformMembers
+            .filter(
+              (member) =>
+                member.platform.name === 'soop' &&
+                member.crewRank?.level === 1 &&
+                member.platformStreamerId,
+            )
+            .map((member) => member.platformStreamerId);
 
           // 해당 크루에 속한 라이브 스트리머 필터링
           const liveStreamers = allLiveStreams.filter((stream) => {

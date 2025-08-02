@@ -79,12 +79,13 @@ export class CrewEarningService {
       order: { broadcastDate: 'DESC' },
     });
 
-    // 멤버별 수익 조회
+    // 멤버별 수익 조회 (새로운 구조에 맞게 수정)
     const memberEarnings = await this.crewEarningRepository
       .createQueryBuilder('earning')
       .leftJoinAndSelect('earning.member', 'member')
-      .leftJoinAndSelect('member.rank', 'rank')
       .leftJoinAndSelect('member.crew', 'crew')
+      .leftJoinAndSelect('member.crewRank', 'crewRank')
+      .leftJoinAndSelect('member.streamer', 'streamer')
       .leftJoinAndSelect('earning.submittedBy', 'submittedBy')
       .where('crew.id = :crewId', { crewId })
       .andWhere('earning.earningDate BETWEEN :startDate AND :endDate', {
@@ -92,7 +93,7 @@ export class CrewEarningService {
         endDate,
       })
       .orderBy('earning.earningDate', 'DESC')
-      .addOrderBy('rank.level', 'ASC')
+      .addOrderBy('crewRank.level', 'ASC')
       .getMany();
 
     // 날짜별로 수익 정보 병합

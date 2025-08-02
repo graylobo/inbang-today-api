@@ -133,7 +133,9 @@ export class StarCraftGameMatchService {
           opponent: {
             id: opponent.id,
             name: opponent.name,
-            race: opponent.race,
+            race:
+              opponent.gameProfiles?.find((p) => p.gameType === 'starcraft')
+                ?.race || null,
           },
           wins: 0,
           losses: 0,
@@ -237,7 +239,7 @@ export class StarCraftGameMatchService {
     return {
       streamerId: query.streamerId,
       streamerName: streamer.name,
-      gender: streamer.gender,
+      gender: streamer.profile?.gender,
       totalEloPoints,
       gainedEloPoints,
       lostEloPoints,
@@ -251,17 +253,10 @@ export class StarCraftGameMatchService {
   }
 
   async getStreamerEloRanking(query: GetStreamerEloRankingDto) {
-    // streamer 조회 조건 설정
-    const streamerWhere: any = {};
-
-    // gender 필터 적용
-    if (query.gender) {
-      streamerWhere.gender = query.gender;
-    }
-
     // 먼저 모든 스트리머 조회 (gender 필터 적용)
     const streamers = await this.streamerRepository.find({
-      where: streamerWhere,
+      relations: ['profile'],
+      where: query.gender ? { profile: { gender: query.gender } } : {},
     });
 
     // 각 스트리머별 ELO 포인트 집계를 위한 배열
@@ -338,7 +333,7 @@ export class StarCraftGameMatchService {
       streamerEloStats.push({
         streamerId: streamer.id,
         streamerName: streamer.name,
-        gender: streamer.gender,
+        gender: streamer.profile?.gender,
         gainedEloPoints,
         lostEloPoints,
         totalEloPoints,

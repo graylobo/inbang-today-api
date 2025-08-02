@@ -31,9 +31,9 @@ export class CrewService {
     try {
       const crews = await this.crewRepository
         .createQueryBuilder('crew')
-        .leftJoinAndSelect('crew.members', 'members')
+        .leftJoinAndSelect('crew.platformMembers', 'platformMembers')
         .leftJoinAndSelect('crew.ranks', 'ranks')
-        .leftJoinAndSelect('members.rank', 'memberRank')
+        .leftJoinAndSelect('platformMembers.crewRank', 'memberRank')
         .getMany();
 
       return crews;
@@ -46,16 +46,16 @@ export class CrewService {
   async findOne(id: number): Promise<Crew> {
     return this.crewRepository
       .createQueryBuilder('crew')
-      .leftJoinAndSelect('crew.members', 'members')
+      .leftJoinAndSelect('crew.platformMembers', 'platformMembers')
       .leftJoinAndSelect('crew.ranks', 'ranks')
-      .leftJoinAndSelect('members.rank', 'memberRank')
+      .leftJoinAndSelect('platformMembers.crewRank', 'memberRank')
       .leftJoinAndSelect(
         'crew.signatureOverviewImageUpdatedBy',
         'signatureOverviewImageUpdatedBy',
       )
       .where('crew.id = :id', { id })
       .orderBy('ranks.level', 'ASC')
-      .addOrderBy('members.name', 'ASC')
+      .addOrderBy('platformMembers.platformUsername', 'ASC')
       .getOne();
   }
 
@@ -192,9 +192,9 @@ export class CrewService {
 
     const crews = await this.crewRepository
       .createQueryBuilder('crew')
-      .leftJoinAndSelect('crew.members', 'members')
+      .leftJoinAndSelect('crew.platformMembers', 'platformMembers')
       .leftJoinAndSelect('crew.ranks', 'ranks')
-      .leftJoinAndSelect('members.rank', 'memberRank')
+      .leftJoinAndSelect('platformMembers.crewRank', 'memberRank')
       .getMany();
 
     // 크루 레벨 수익 조회
@@ -235,7 +235,8 @@ export class CrewService {
     // 멤버별 수익은 해당 날짜에 크루 레벨 수익이 없는 경우에만 처리
     memberEarnings.forEach((earning) => {
       const dateKey = new Date(earning.earningDate).toISOString().split('T')[0];
-      const crewId = earning.member.crew.id;
+      // member는 StreamerPlatform이므로 crew를 직접 접근
+      const crewId = earning.member.crew?.id || 0;
 
       if (!crewDailyEarnings.has(dateKey)) {
         crewDailyEarnings.set(dateKey, new Map());
@@ -275,19 +276,23 @@ export class CrewService {
   private async checkRanksInUse(crewId: number): Promise<number[]> {
     const result = await this.crewRepository
       .createQueryBuilder('crew')
-      .leftJoinAndSelect('crew.members', 'members')
-      .leftJoinAndSelect('members.rank', 'rank')
+      .leftJoinAndSelect('crew.platformMembers', 'platformMembers')
+      .leftJoinAndSelect('platformMembers.crewRank', 'rank')
       .where('crew.id = :crewId', { crewId })
       .getOne();
 
-    if (!result || !result.members || result.members.length === 0) {
+    if (
+      !result ||
+      !result.platformMembers ||
+      result.platformMembers.length === 0
+    ) {
       return [];
     }
 
     // 스트리머가 사용 중인 랭크 ID 수집
-    return result.members
-      .filter((member) => member.rank && member.rank.id)
-      .map((member) => member.rank.id);
+    return result.platformMembers
+      .filter((member) => member.crewRank && member.crewRank.id)
+      .map((member) => member.crewRank.id);
   }
 
   async updateSignatureOverviewImageUrl(

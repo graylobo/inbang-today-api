@@ -1,6 +1,6 @@
 import { Column, Entity, ManyToOne, PrimaryGeneratedColumn } from 'typeorm';
 import { BaseEntity } from './base.entity';
-import { Streamer } from './streamer.entity';
+import { StreamerPlatform } from './streamer-platform.entity';
 import { User } from './user.entity';
 
 @Entity()
@@ -8,8 +8,8 @@ export class CrewEarning extends BaseEntity {
   @PrimaryGeneratedColumn()
   id: number;
 
-  @ManyToOne(() => Streamer, { eager: true, onDelete: 'CASCADE' })
-  member: Streamer;
+  @ManyToOne(() => StreamerPlatform, { eager: true, onDelete: 'CASCADE' })
+  member: StreamerPlatform;
 
   @ManyToOne(() => User, { eager: true })
   submittedBy: User;

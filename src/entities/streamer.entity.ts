@@ -2,18 +2,15 @@ import {
   Entity,
   PrimaryGeneratedColumn,
   Column,
-  ManyToOne,
   OneToMany,
+  OneToOne,
 } from 'typeorm';
-import { Crew } from './crew.entity';
-import { CrewRank } from './crew-rank.entity';
 import { CrewEarning } from './crew-earning.entity';
 import { StreamerCategory } from './streamer-category.entity';
 import { StreamerEloRecord } from './streamer-elo-record.entity';
-import {
-  StarCraftRace,
-  StreamerGender,
-} from 'src/entities/types/streamer.type';
+import { StreamerPlatform } from './streamer-platform.entity';
+import { StreamerProfile } from './streamer-profile.entity';
+import { StreamerGameProfile } from './streamer-game-profile.entity';
 
 @Entity()
 export class Streamer {
@@ -21,39 +18,10 @@ export class Streamer {
   id: number;
 
   @Column({ unique: true })
-  name: string;
+  name: string; // 스트리머의 기본 이름 (시스템 내 고유명)
 
   @Column({ nullable: true, unique: true })
-  nickname: string;
-
-  @Column({ nullable: true, unique: true })
-  soopId: string;
-
-  @Column({ nullable: true, unique: true })
-  eloBoardId: string;
-
-  @Column({
-    type: 'enum',
-    enum: StarCraftRace,
-    nullable: true,
-  })
-  race: StarCraftRace;
-
-  @Column({ nullable: true })
-  tier: string;
-
-  @Column({
-    type: 'enum',
-    enum: StreamerGender,
-    nullable: true,
-  })
-  gender: StreamerGender;
-
-  @ManyToOne(() => Crew, (crew) => crew.members)
-  crew: Crew;
-
-  @ManyToOne(() => CrewRank, (rank) => rank.members, { eager: true })
-  rank: CrewRank;
+  nickname: string; // 닉네임 (선택사항)
 
   @OneToMany(() => CrewEarning, (earning) => earning.member)
   earnings: CrewEarning[];
@@ -66,4 +34,13 @@ export class Streamer {
 
   @OneToMany(() => StreamerEloRecord, (eloRecord) => eloRecord.streamer)
   eloRecords: StreamerEloRecord[];
+
+  @OneToMany(() => StreamerPlatform, (platform) => platform.streamer)
+  platforms: StreamerPlatform[];
+
+  @OneToOne(() => StreamerProfile, (profile) => profile.streamer)
+  profile: StreamerProfile;
+
+  @OneToMany(() => StreamerGameProfile, (gameProfile) => gameProfile.streamer)
+  gameProfiles: StreamerGameProfile[];
 }

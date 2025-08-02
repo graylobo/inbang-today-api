@@ -7,6 +7,9 @@ import { CrewEarning } from 'src/entities/crew-earning.entity';
 import { CrewRank } from 'src/entities/crew-rank.entity';
 import { CrewBroadcast } from 'src/entities/crew-broadcast.entity';
 import { User } from 'src/entities/user.entity';
+import { Streamer } from 'src/entities/streamer.entity';
+import { Platform } from 'src/entities/platform.entity';
+import { StreamerPlatform } from 'src/entities/streamer-platform.entity';
 
 @Module({
   imports: [
@@ -16,6 +19,9 @@ import { User } from 'src/entities/user.entity';
       CrewRank,
       CrewBroadcast,
       User,
+      Streamer,
+      Platform,
+      StreamerPlatform,
     ]),
   ],
   providers: [CrewService],
