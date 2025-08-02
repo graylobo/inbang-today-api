@@ -25,7 +25,7 @@ import { TARGET_STREAMERS } from 'src/modules/crawler/metadata';
 import { StreamInfo } from 'src/modules/crawler/type';
 import { RedisService } from 'src/modules/redis/redis.service';
 import { formatDateString } from 'src/utils/format-date-string.utils';
-import { Between, ILike, In, IsNull, Repository } from 'typeorm';
+import { Between, ILike, In, Repository } from 'typeorm';
 
 export interface MatchData {
   date: string;
@@ -977,23 +977,30 @@ export class CrawlerService {
 
       // 모든 크루 정보 가져오기
       const crews = await this.crewRepository.find({
-        relations: ['platformMembers', 'platformMembers.crewRank'],
+        relations: [
+          'platformMembers',
+          'platformMembers.crewRank',
+          'platformMembers.platform',
+        ],
       });
 
       // 각 크루별로 라이브 스트리머 정보 계산
       const crewsInfo = await Promise.all(
         crews.map(async (crew) => {
-          // 크루원 ID 목록 추출 (soop 플랫폼)
+          // 크루원 ID 목록 추출 (soop 플랫폼만)
           const memberIds = crew.platformMembers
-            .filter((member) => member.platform.name === 'soop')
+            .filter(
+              (member) =>
+                member.platform?.name === 'soop' && member.platformStreamerId,
+            )
             .map((member) => member.platformStreamerId)
             .filter(Boolean);
 
-          // 대표 스트리머 찾기 (rank.level === 1인 멤버들)
+          // 대표 스트리머 찾기 (soop 플랫폼의 rank.level === 1인 멤버들)
           const representativeMemberIds = crew.platformMembers
             .filter(
               (member) =>
-                member.platform.name === 'soop' &&
+                member.platform?.name === 'soop' &&
                 member.crewRank?.level === 1 &&
                 member.platformStreamerId,
             )
