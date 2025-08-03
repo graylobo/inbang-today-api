@@ -57,5 +57,6 @@ export class StreamerProfile {
 
   // Relations
   @OneToOne(() => Streamer, (streamer) => streamer.profile)
+  @JoinColumn({ name: 'streamerId' })
   streamer: Streamer;
 }
