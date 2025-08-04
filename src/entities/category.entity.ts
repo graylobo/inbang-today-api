@@ -1,4 +1,11 @@
-import { Entity, PrimaryGeneratedColumn, Column, OneToMany } from 'typeorm';
+import {
+  Entity,
+  PrimaryGeneratedColumn,
+  Column,
+  OneToMany,
+  ManyToOne,
+  JoinColumn,
+} from 'typeorm';
 import { StreamerCategory } from './streamer-category.entity';
 import { BaseEntity } from './base.entity';
 
@@ -20,9 +27,16 @@ export class Category extends BaseEntity {
   @Column({ nullable: true })
   iconUrl: string;
 
-  // 부모 카테고리 (선택 사항 - 계층 구조 지원)
-  @Column({ nullable: true })
-  parentId: number;
+  // 부모 카테고리 관계
+  @ManyToOne(() => Category, (category) => category.children, {
+    nullable: true,
+  })
+  @JoinColumn({ name: 'parentId' })
+  parent: Category | null;
+
+  // 자식 카테고리들
+  @OneToMany(() => Category, (category) => category.parent)
+  children: Category[];
 
   // 카테고리 정렬 순서
   @Column({ default: 0 })

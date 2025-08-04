@@ -11,9 +11,10 @@ import { StreamerEloRecord } from './streamer-elo-record.entity';
 import { StreamerPlatform } from './streamer-platform.entity';
 import { StreamerProfile } from './streamer-profile.entity';
 import { StreamerGameProfile } from './streamer-game-profile.entity';
+import { BaseEntity } from 'src/entities/base.entity';
 
 @Entity()
-export class Streamer {
+export class Streamer extends BaseEntity {
   @PrimaryGeneratedColumn()
   id: number;
 

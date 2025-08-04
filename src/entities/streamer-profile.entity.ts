@@ -1,17 +1,16 @@
+import { BaseEntity } from 'src/entities/base.entity';
 import {
-  Entity,
-  PrimaryGeneratedColumn,
   Column,
-  OneToOne,
+  Entity,
   JoinColumn,
-  CreateDateColumn,
-  UpdateDateColumn,
+  OneToOne,
+  PrimaryGeneratedColumn,
 } from 'typeorm';
 import { Streamer } from './streamer.entity';
 import { StreamerGender } from './types/streamer.type';
 
 @Entity()
-export class StreamerProfile {
+export class StreamerProfile extends BaseEntity {
   @PrimaryGeneratedColumn()
   id: number;
 
@@ -48,12 +47,6 @@ export class StreamerProfile {
 
   @Column({ default: true })
   isPublic: boolean; // 공개 여부
-
-  @CreateDateColumn()
-  createdAt: Date;
-
-  @UpdateDateColumn()
-  updatedAt: Date;
 
   // Relations
   @OneToOne(() => Streamer, (streamer) => streamer.profile)
