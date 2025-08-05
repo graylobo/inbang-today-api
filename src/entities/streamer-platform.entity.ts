@@ -16,7 +16,7 @@ export class StreamerPlatform {
   @PrimaryGeneratedColumn()
   id: number;
 
-  @Column({ unique: true })
+  @Column({ nullable: true })
   platformStreamerId: string; // 플랫폼에서의 고유 ID (soopId, chzzkId 등)
 
   @Column({ nullable: true })
