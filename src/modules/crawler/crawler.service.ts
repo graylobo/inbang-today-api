@@ -903,54 +903,65 @@ export class CrawlerService {
 
   async updateAllStreamersSoopId(): Promise<void> {
     try {
-      // 모든 스트리머 정보를 한 번에 가져옴
+      // 1) 크롤링으로 soop 채널 ID 수집: Map<streamerName, soopId>
       const streamersInfo = await this.getAllStreamersInfo();
       console.log(`크롤링된 스트리머 수: ${streamersInfo.size}`);
 
-      // DB의 모든 스트리머 조회 (soopId가 없는 스트리머만 조회)
-      const streamers = await this.streamerRepository.find({
-        relations: ['platforms'],
+      // 2) soop 플랫폼 엔티티 조회 (한 번만)
+      const soopPlatform = await this.platformRepository.findOne({
+        where: { name: 'soop' },
       });
-
-      // soopId가 없는 스트리머만 필터링
-      const streamersWithoutSoopId = streamers.filter(
-        (streamer) =>
-          !streamer.platforms.some(
-            (platform) =>
-              platform.platformStreamerId && platform.platform.name === 'soop',
-          ),
-      );
-
-      console.log(`DB의 스트리머 수: ${streamers.length}`);
-
-      // 각 스트리머 정보 업데이트
-      for (const streamer of streamersWithoutSoopId) {
-        const soopId = streamersInfo.get(streamer.name);
-
-        if (soopId) {
-          // Platform 정보 찾기
-          const soopPlatform = await this.platformRepository.findOne({
-            where: { name: 'soop' },
-          });
-
-          if (soopPlatform) {
-            // StreamerPlatform 생성
-            await this.streamerPlatformRepository.save({
-              streamerId: streamer.id,
-              platformId: soopPlatform.id,
-              platformStreamerId: soopId,
-              platformUsername: streamer.name,
-            });
-            console.log(
-              `✅ ${streamer.name}의 soopId를 ${soopId}로 업데이트 완료`,
-            );
-          }
-        } else {
-          console.log(`❌ ${streamer.name}의 soopId를 찾을 수 없음`);
-        }
+      if (!soopPlatform) {
+        throw new Error('soop 플랫폼 엔티티를 찾을 수 없습니다.');
       }
 
-      console.log('모든 스트리머 정보 업데이트 완료');
+      // 3) 모든 스트리머와 해당 플랫폼 관계 로드 (platforms.platform 포함)
+      const streamers = await this.streamerRepository.find({
+        relations: ['platforms', 'platforms.platform'],
+      });
+      console.log(`DB의 스트리머 수: ${streamers.length}`);
+
+      // 4) 각 스트리머별 soop 플랫폼 정보 upsert
+      for (const streamer of streamers) {
+        const soopId = streamersInfo.get(streamer.name);
+
+        // 해당 스트리머의 soop 플랫폼 레코드가 이미 존재하는지 확인
+        const existingSoop = streamer.platforms?.find(
+          (p) => p.platform?.name === 'soop',
+        );
+
+        if (!soopId) {
+          // 크롤링 정보에 없으면 스킵
+          console.log(`❌ ${streamer.name}의 soopId를 찾을 수 없음`);
+          continue;
+        }
+
+        if (existingSoop) {
+          // 이미 soop 플랫폼이 연결되어 있는 경우: platformStreamerId 갱신 필요 시 업데이트
+          if (existingSoop.platformStreamerId !== soopId) {
+            existingSoop.platformStreamerId = soopId;
+            existingSoop.platformUsername =
+              existingSoop.platformUsername || streamer.name;
+            existingSoop.isActive = true;
+            await this.streamerPlatformRepository.save(existingSoop);
+            console.log(`🔁 ${streamer.name}의 soopId를 ${soopId}로 갱신 완료`);
+          }
+          continue;
+        }
+
+        // soop 플랫폼 레코드가 없는 경우: 새로 생성
+        const newStreamerPlatform = this.streamerPlatformRepository.create({
+          streamer: { id: streamer.id },
+          platform: { id: soopPlatform.id },
+          platformStreamerId: soopId,
+          platformUsername: streamer.name,
+          isActive: true,
+        });
+        await this.streamerPlatformRepository.save(newStreamerPlatform);
+        console.log(`✅ ${streamer.name}의 soopId를 ${soopId}로 등록 완료`);
+      }
+
+      console.log('모든 스트리머 soop 정보 업데이트 완료');
     } catch (error) {
       console.error('스트리머 일괄 업데이트 실패:', error);
       throw error;
