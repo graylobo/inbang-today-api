@@ -25,7 +25,8 @@ import { TARGET_STREAMERS } from 'src/modules/crawler/metadata';
 import { StreamInfo } from 'src/modules/crawler/type';
 import { RedisService } from 'src/modules/redis/redis.service';
 import { formatDateString } from 'src/utils/format-date-string.utils';
-import { Between, ILike, In, Repository } from 'typeorm';
+import { Between, In, Repository } from 'typeorm';
+import { CategoryName } from 'src/entities/types/category.type';
 
 export interface MatchData {
   date: string;
@@ -567,11 +568,11 @@ export class CrawlerService {
       // 스트리머 캐시에 추가
       newStreamers.forEach((s) => existingStreamerMapCache.set(s.name, s));
 
-      // 스타크래프트 카테고리 찾기
-      const starcraftCategory = await this.categoryRepository.findOne({
-        where: { name: ILike('%starcraft%') },
-      });
-
+      // 스타크래프트 카테고리 보장 후 ID 획득
+      const starcraftCategory = await this.ensureCategoryExists(
+        CategoryName.Starcraft,
+        'StarCraft related streamers',
+      );
       if (starcraftCategory) {
         // 각 신규 스트리머에 스타크래프트 카테고리 연결
         for (const streamer of newStreamers) {
@@ -590,8 +591,6 @@ export class CrawlerService {
             );
           }
         }
-      } else {
-        console.warn('Starcraft category not found in the database');
       }
     }
 
@@ -604,6 +603,15 @@ export class CrawlerService {
       const newMaps = await this.starCraftMapRepository.save(mapsToCreate);
       newMaps.forEach((m) => existingMapCache.set(m.name, m));
     }
+  }
+
+  // 카테고리 존재 보장 (없으면 생성)
+  private async ensureCategoryExists(name: string, description?: string) {
+    let category = await this.categoryRepository.findOne({ where: { name } });
+    if (!category) {
+      category = await this.categoryRepository.save({ name, description });
+    }
+    return category;
   }
 
   private async saveMatchesInBatches(
@@ -728,6 +736,26 @@ export class CrawlerService {
             const existingMatch = existingMatchesByHash.get(hash);
 
             if (!existingMatch) {
+              // 매치 저장 전, 해당 스트리머에 스타크래프트 카테고리 보장
+              try {
+                const starcraftCategory = await this.ensureCategoryExists(
+                  CategoryName.Starcraft,
+                  'StarCraft related streamers',
+                );
+                await this.streamerCategoryService.addCategoryToStreamer(
+                  newMatch.winner.id,
+                  starcraftCategory.id,
+                );
+                await this.streamerCategoryService.addCategoryToStreamer(
+                  newMatch.loser.id,
+                  starcraftCategory.id,
+                );
+              } catch (e) {
+                console.warn(
+                  'Failed to ensure starcraft category for streamers',
+                  e,
+                );
+              }
               // 새로운 매치 추가
               const savedMatch = await manager.save(newMatch);
               totalSaved++;

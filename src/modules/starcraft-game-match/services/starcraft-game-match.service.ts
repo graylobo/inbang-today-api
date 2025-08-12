@@ -85,85 +85,137 @@ export class StarCraftGameMatchService {
   }
 
   async getStreamerStats(query: GetStreamerStatsDto) {
-    const queryBuilder = this.starCraftGameMatchRepository
+    const streamerId = Number(query.streamerId);
+
+    // 전체 스트리머 합계 (wins/losses) 계산
+    const totalsQb = this.starCraftGameMatchRepository
       .createQueryBuilder('match')
-      .leftJoinAndSelect('match.winner', 'winner')
-      .leftJoinAndSelect('match.loser', 'loser')
+      .leftJoin('match.winner', 'winner')
+      .leftJoin('match.loser', 'loser')
       .where('(winner.id = :streamerId OR loser.id = :streamerId)', {
-        streamerId: query.streamerId,
-      });
+        streamerId,
+      })
+      .select(
+        `SUM(CASE WHEN winner.id = :streamerId THEN 1 ELSE 0 END)`,
+        'wins',
+      )
+      .addSelect(
+        `SUM(CASE WHEN loser.id = :streamerId THEN 1 ELSE 0 END)`,
+        'losses',
+      )
+      .addSelect(`COUNT(*)`, 'total')
+      .setParameters({ streamerId });
 
     if (query.startDate && query.endDate) {
       const startDateTime = new Date(query.startDate);
       startDateTime.setHours(0, 0, 0, 0);
-
       const endDateTime = new Date(query.endDate);
       endDateTime.setHours(23, 59, 59, 999);
-
-      queryBuilder.andWhere('match.date BETWEEN :startDate AND :endDate', {
+      totalsQb.andWhere('match.date BETWEEN :startDate AND :endDate', {
         startDate: startDateTime,
         endDate: endDateTime,
       });
     }
 
-    const matches = await queryBuilder.getMany();
+    const rawTotals = (await totalsQb.getRawOne()) as
+      | {
+          wins?: string | number;
+          losses?: string | number;
+          total?: string | number;
+        }
+      | undefined;
 
+    const streamerWins = Number(rawTotals?.wins ?? 0);
+    const streamerLosses = Number(rawTotals?.losses ?? 0);
+    const streamerTotal = Number(rawTotals?.total ?? 0);
     const streamerStats = {
-      totalGames: 0,
-      wins: 0,
-      losses: 0,
-      winRate: 0,
+      totalGames: streamerTotal,
+      wins: streamerWins,
+      losses: streamerLosses,
+      winRate: streamerTotal > 0 ? (streamerWins / streamerTotal) * 100 : 0,
     };
 
-    const opponentStats = new Map<number, OpponentStats>();
+    // 상대별 전적 집계 (방향성 보장)
+    const opponentsQb = this.starCraftGameMatchRepository
+      .createQueryBuilder('match')
+      .leftJoin('match.winner', 'winner')
+      .leftJoin('match.loser', 'loser')
+      .leftJoin(
+        'winner.gameProfiles',
+        'winnerGameProfile',
+        "winnerGameProfile.gameType = 'starcraft'",
+      )
+      .leftJoin(
+        'loser.gameProfiles',
+        'loserGameProfile',
+        "loserGameProfile.gameType = 'starcraft'",
+      )
+      .where('(winner.id = :streamerId OR loser.id = :streamerId)', {
+        streamerId,
+      })
+      // override default selection (avoid selecting match.* which breaks GROUP BY)
+      .select(
+        `CASE WHEN winner.id = :streamerId THEN loser.id ELSE winner.id END`,
+        'opponent_id',
+      )
+      .addSelect(
+        `CASE WHEN winner.id = :streamerId THEN loser.name ELSE winner.name END`,
+        'opponent_name',
+      )
+      .addSelect(
+        `SUM(CASE WHEN winner.id = :streamerId THEN 1 ELSE 0 END)`,
+        'wins',
+      )
+      .addSelect(
+        `SUM(CASE WHEN loser.id = :streamerId THEN 1 ELSE 0 END)`,
+        'losses',
+      )
+      .addSelect(`COUNT(*)`, 'total_games')
+      .addSelect(
+        `CASE WHEN winner.id = :streamerId THEN loserGameProfile.race ELSE winnerGameProfile.race END`,
+        'opponent_race',
+      )
+      .groupBy('opponent_id')
+      .addGroupBy('opponent_name')
+      .addGroupBy('opponent_race')
+      .setParameters({ streamerId });
 
-    matches.forEach((match) => {
-      const isWinner = match.winner.id === Number(query.streamerId);
-      const opponent = isWinner ? match.loser : match.winner;
+    if (query.startDate && query.endDate) {
+      const startDateTime = new Date(query.startDate);
+      startDateTime.setHours(0, 0, 0, 0);
+      const endDateTime = new Date(query.endDate);
+      endDateTime.setHours(23, 59, 59, 999);
+      opponentsQb.andWhere('match.date BETWEEN :startDate AND :endDate', {
+        startDate: startDateTime,
+        endDate: endDateTime,
+      });
+    }
 
-      streamerStats.totalGames++;
-      if (isWinner) {
-        streamerStats.wins++;
-      } else {
-        streamerStats.losses++;
-      }
-
-      if (!opponentStats.has(opponent.id)) {
-        opponentStats.set(opponent.id, {
-          opponent: {
-            id: opponent.id,
-            name: opponent.name,
-            race:
-              opponent.gameProfiles?.find((p) => p.gameType === 'starcraft')
-                ?.race || null,
-          },
-          wins: 0,
-          losses: 0,
-          totalGames: 0,
-          winRate: 0,
-        });
-      }
-
-      const stats = opponentStats.get(opponent.id)!;
-      if (isWinner) {
-        stats.wins++;
-      } else {
-        stats.losses++;
-      }
-      stats.totalGames++;
-      stats.winRate = (stats.wins / stats.totalGames) * 100;
+    const rows = await opponentsQb.getRawMany();
+    const opponents: OpponentStats[] = rows.map((row) => {
+      const wins = Number(row.wins) || 0;
+      const losses = Number(row.losses) || 0;
+      const totalGames = Number(row.total_games) || 0;
+      const winRate = totalGames > 0 ? (wins / totalGames) * 100 : 0;
+      return {
+        opponent: {
+          id: Number(row.opponent_id),
+          name: row.opponent_name,
+          race: row.opponent_race || null,
+        },
+        wins,
+        losses,
+        totalGames,
+        winRate,
+      };
     });
 
-    streamerStats.winRate =
-      streamerStats.totalGames > 0
-        ? (streamerStats.wins / streamerStats.totalGames) * 100
-        : 0;
+    // totalGames desc 정렬
+    opponents.sort((a, b) => b.totalGames - a.totalGames);
 
     return {
       streamer: streamerStats,
-      opponents: Array.from(opponentStats.values()).sort(
-        (a, b) => b.totalGames - a.totalGames,
-      ),
+      opponents,
     };
   }
 
